@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 import rospy
 from detect_people_server import FaceID, GenderAndAge, PoseEstimator
-
-
 from pepper_clf_msgs.srv import DepthAndColorImage
 from openpose_ros_msgs.srv import GetCrowdAttributes, GetCrowdAttributesResponse
 from clf_perception_vision_msgs.srv import LearnPerson, LearnPersonResponse
+
 
 class PeopleAttributeServer:
     def __init__(self):
@@ -17,7 +16,7 @@ class PeopleAttributeServer:
         self.face_know_topic = 'clf_face_identification_know_image'
         self.face_learn_topic = 'clf_face_identification_learn_image'
         self.gender_age_topic = 'clf_gender_age_classify_array'
-        rospy.init_node('people_attribute_server', anonymous=True)
+        rospy.init_node('people_attribute_server')
 
         self.image_grabber = rospy.ServiceProxy(self.image_topic, DepthAndColorImage)
         self.crowd_service = rospy.Service(self.crowd_topic, GetCrowdAttributes, self.detect_crowd)
@@ -27,10 +26,11 @@ class PeopleAttributeServer:
         self.gender_age = GenderAndAge(self.gender_age_topic)
         self.estimator = PoseEstimator()
 
-    def detect_crowd(self):
+    def detect_crowd(self, request):
         response = GetCrowdAttributesResponse()
         image = self.image_grabber.call()
-        response.attributes = self.estimator.get_persons(image.color, image.depth)
+        response.attributes = self.estimator.get_person_attributes(image.color, image.depth)
+
         return response
 
     def learn_face(self, request):

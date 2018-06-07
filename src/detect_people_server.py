@@ -6,8 +6,10 @@ import cv2
 import numpy as np
 from threading import Lock
 
-from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage
-from gender_and_age_msgs.srv import GenderAndAgeService
+from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage, \
+    DoIKnowThatPersonImageRequest, LearnPersonResponse, LearnPersonImageRequest
+from gender_and_age_msgs.srv import GenderAndAgeService, GenderAndAgeServiceRequest
+
 
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import String
@@ -94,9 +96,14 @@ class ShirtColor:
 class GenderAndAge:
     def __init__(self, topic):
         self.topic = topic
+        self.sc = rospy.ServiceProxy(self.topic, GenderAndAgeService)
+        self.initialized = True  # todo: wait for service server
 
-    def get_gender_and_age(self, cropped_image):
-        pass
+    def get_genders_and_ages(self, cropped_images):
+        req = GenderAndAgeServiceRequest()
+        req.objects = cropped_images
+        resp = self.sc.call(req)
+        return resp.gender_and_age_list
 
 
 class FaceID:
@@ -105,12 +112,23 @@ class FaceID:
         self.classify_topic = classify_topic
         self.learn_face_sc = rospy.ServiceProxy(self.learn_topic, LearnPersonImage)
         self.get_face_name_sc = rospy.ServiceProxy(self.classify_topic, DoIKnowThatPersonImage)
+        self.initialized = True  # todo: wait for service server
 
     def get_name(self, cropped_image):
-        pass
+        req = DoIKnowThatPersonImageRequest()
+        req.roi = cropped_image
+        r = self.get_face_name_sc.call(req)
+        return r.name
 
     def learn_face(self, cropped_image, name):
-        pass
+        response = LearnPersonResponse()
+        req = LearnPersonImageRequest()
+        req.roi = cropped_image
+        req.name = name
+        r = self.learn_face_sc.call(req)
+        response.success = r.success
+        response.name = r.name
+        return response
 
 
 class Helper:
@@ -162,13 +180,10 @@ class PoseEstimator:
 
         for human in humans:
             Helper.get_posture_and_gesture(human)
-            ShirtColor.get_shirt_color(Helper.upper_body_roi(color,human))
-            GenderAndAge.get_gender_and_age(Helper.head_roi(color,human))
-
+            ShirtColor.get_shirt_color(Helper.upper_body_roi(color, human))
+            GenderAndAge.get_gender_and_age(Helper.head_roi(color, human))
 
     def get_closest_person_face(self, color, depth):
-
         attributes = self.get_person_attributes(color, depth)
         #filter closest
-
         pass
