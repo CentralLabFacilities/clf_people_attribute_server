@@ -7,7 +7,6 @@ from pepper_clf_msgs.srv import DepthAndColorImage
 from openpose_ros_msgs.srv import GetCrowdAttributes, GetCrowdAttributesResponse
 from clf_perception_vision_msgs.srv import LearnPerson, LearnPersonResponse
 
-
 class PeopleAttributeServer:
     def __init__(self):
         rospy.loginfo('>>init PeopleAttributeServer')

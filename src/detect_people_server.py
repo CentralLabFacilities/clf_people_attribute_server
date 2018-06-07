@@ -5,6 +5,7 @@ import os
 import cv2
 import numpy as np
 from threading import Lock
+
 from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage
 from gender_and_age_msgs.srv import GenderAndAgeService
 
@@ -148,8 +149,7 @@ class PoseEstimator:
 
         self.pose_estimator = TfPoseEstimator(graph_path, target_size=(w, h))
 
-    @staticmethod
-    def get_humans(self, color):
+    def get_person_attributes(self, color, depth):
 
         acquired = self.tf_lock.acquire(False)
         if not acquired:
@@ -160,16 +160,15 @@ class PoseEstimator:
         finally:
             self.tf_lock.release()
 
-        return humans
+        for human in humans:
+            Helper.get_posture_and_gesture(human)
+            ShirtColor.get_shirt_color(Helper.upper_body_roi(color,human))
+            GenderAndAge.get_gender_and_age(Helper.head_roi(color,human))
 
-    def get_person_attributes(self, color, depth):
-
-        humans = self.get_humans(color)
-
-        pass
 
     def get_closest_person_face(self, color, depth):
 
-        humans = self.get_humans(color)
+        attributes = self.get_person_attributes(color, depth)
+        #filter closest
 
         pass
