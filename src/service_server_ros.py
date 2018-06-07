@@ -3,7 +3,8 @@ import rospy
 from detect_people_server import FaceID, GenderAndAge, PoseEstimator
 from pepper_clf_msgs.srv import DepthAndColorImage
 from openpose_ros_msgs.srv import GetCrowdAttributes, GetCrowdAttributesResponse
-from clf_perception_vision_msgs.srv import LearnPerson, LearnPersonResponse
+from clf_perception_vision_msgs.srv import LearnPerson
+from cv_bridge import CvBridge, CvBridgeError
 
 
 class PeopleAttributeServer:
@@ -24,25 +25,37 @@ class PeopleAttributeServer:
 
         self.face_id = FaceID(self.face_know_topic, self.face_learn_topic)
         self.gender_age = GenderAndAge(self.gender_age_topic)
-        self.estimator = PoseEstimator()
+
+        self.cv_bridge = CvBridge()
+        self.estimator = PoseEstimator(cv_bridge=self.cv_bridge, face_id=self.face_id, gender_age=self.gender_age)
+        rospy.loginfo('pose_estimator ready')
 
     def detect_crowd(self, request):
         response = GetCrowdAttributesResponse()
         image = self.image_grabber.call()
-        response.attributes = self.estimator.get_person_attributes(image.color, image.depth)
-
-        return response
+        try:
+            color = self.cv_bridge.imgmsg_to_cv2(image.color, "bgr8")
+            depth = self.cv_bridge.imgmsg_to_cv2(image.depth, "32FC1")
+            response.attributes = self.estimator.get_person_attributes(color, depth)
+            return response
+        except CvBridgeError as e:
+            rospy.logerr('[tf-pose-estimation] Converting Image Error. ' + str(e))
+        return
 
     def learn_face(self, request):
-        response = LearnPersonResponse()
         image = self.image_grabber.call()
-        face = self.estimator.get_closest_person_face(image.color, image.depth)
-        response.success = self.face_id.learn_face(face, request.name)
-        return response
+        try:
+            color = self.cv_bridge.imgmsg_to_cv2(image.color, "bgr8")
+            depth = self.cv_bridge.imgmsg_to_cv2(image.depth, "32FC1")
+            face = self.estimator.get_closest_person_face(color, depth)
+            response = self.face_id.learn_face(face, request.name)
+            return response
+        except CvBridgeError as e:
+            rospy.logerr('[tf-pose-estimation] Converting Image Error. ' + str(e))
+        return
 
 
 if __name__ == "__main__":
-
     server = PeopleAttributeServer()
     while not rospy.is_shutdown():
         try:

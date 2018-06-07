@@ -9,7 +9,7 @@ from threading import Lock
 from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage, \
     DoIKnowThatPersonImageRequest, LearnPersonResponse, LearnPersonImageRequest
 from gender_and_age_msgs.srv import GenderAndAgeService, GenderAndAgeServiceRequest
-
+from openpose_ros_msgs.msg import PersonAttributes
 
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import String
@@ -18,6 +18,26 @@ from tfpose_ros.msg import Persons, Person, BodyPartElm
 
 from tf_pose.estimator import TfPoseEstimator
 from tf_pose.networks import model_wh, get_graph_path
+from tfpose_ros.msg import Persons, Person, BodyPartElm
+
+body_parts = ['Nose',
+              'Neck',
+              'RightShoulder',
+              'RightElbow',
+              'RightWrist',
+              'LeftShoulder',
+              'LeftElbow',
+              'LeftWrist',
+              'RightHip',
+              'RightKnee',
+              'RightAnkle',
+              'LeftHip',
+              'LeftKnee',
+              'LeftAnkle',
+              'RightEye',
+              'LeftEye',
+              'RightEar',
+              'LeftEar']
 
 
 class ShirtColor:
@@ -107,7 +127,7 @@ class GenderAndAge:
 
 
 class FaceID:
-    def __init__(self, learn_topic, classify_topic):
+    def __init__(self, classify_topic, learn_topic):
         self.learn_topic = learn_topic
         self.classify_topic = classify_topic
         self.learn_face_sc = rospy.ServiceProxy(self.learn_topic, LearnPersonImage)
@@ -123,7 +143,7 @@ class FaceID:
     def learn_face(self, cropped_image, name):
         response = LearnPersonResponse()
         req = LearnPersonImageRequest()
-        req.roi = cropped_image
+        #req.roi = cropped_image
         req.name = name
         r = self.learn_face_sc.call(req)
         response.success = r.success
@@ -135,25 +155,36 @@ class Helper:
     def __init__(self):
         pass
 
-    def depth_lookup(self, image, x, y, cx, cy, fx, fy):
+    @staticmethod
+    def depth_lookup(image, x, y, cx, cy, fx, fy):
         pass
 
-    def head_roi(self, image, person):
-        pass
+    @staticmethod
+    def head_roi(image, person):
+        l_ear = person.body_parts[body_parts.index('LeftEar')]
+        r_ear = person.body_parts[body_parts.index('RightEar')]
+        print(l_ear)
+        print(r_ear)
+        return image  # TODO: IMPLEMENT CORRECTLY
 
-    def upper_body_roi(self, image, person):
-        pass
+    @staticmethod
+    def upper_body_roi(image, person):
+        return image  # TODO: IMPLEMENT CORRECTLY
 
-    def get_posture_and_gesture(self, person):
+    @staticmethod
+    def get_posture_and_gesture(person):
         pass
 
 
 class PoseEstimator:
-    def __init__(self):
+    def __init__(self, cv_bridge, face_id=None, gender_age=None):
 
-        model = rospy.get_param('~model', 'cmu')
+        model = rospy.get_param('~model', 'mobilenet_thin')
         resolution = rospy.get_param('~resolution', '432x368')
         self.resize_out_ratio = float(rospy.get_param('~resize_out_ratio', '4.0'))
+        self.face_id = face_id
+        self.gender_age = gender_age
+        self.cv_bridge = cv_bridge
         self.tf_lock = Lock()
 
         try:
@@ -174,16 +205,29 @@ class PoseEstimator:
             return
 
         try:
+            ts = rospy.Time.now()
             humans = self.pose_estimator.inference(color, resize_to_default=True, upsample_size=self.resize_out_ratio)
+            print('timing: %r' % (rospy.Time.now()-ts).to_sec())
         finally:
             self.tf_lock.release()
 
+        persons = []
         for human in humans:
-            Helper.get_posture_and_gesture(human)
-            ShirtColor.get_shirt_color(Helper.upper_body_roi(color, human))
-            GenderAndAge.get_gender_and_age(Helper.head_roi(color, human))
+            person = PersonAttributes()
+            # Helper.get_posture_and_gesture(human)
+            face = self.cv_bridge.cv2_to_imgmsg(Helper.head_roi(color, human), "bgr8")
+            # person.shirtcolor = ShirtColor.get_shirt_color(Helper.upper_body_roi(color, human))
+            if self.gender_age is not None and self.gender_age.initialized:
+                pass
+                # GenderAndAge.get_gender_and_age(face)
+            if self.face_id is not None and self.face_id.initialized:
+                person.name = self.face_id.get_name(face)
+            persons.append(person)
+        print(persons)
+        return persons
 
     def get_closest_person_face(self, color, depth):
         attributes = self.get_person_attributes(color, depth)
         #filter closest
         pass
+
