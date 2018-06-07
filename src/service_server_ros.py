@@ -47,7 +47,7 @@ class PeopleAttributeServer:
         try:
             color = self.cv_bridge.imgmsg_to_cv2(image.color, "bgr8")
             depth = self.cv_bridge.imgmsg_to_cv2(image.depth, "32FC1")
-            face = self.estimator.get_closest_person_face(color, depth)
+            face = self.cv_bridge.cv2_to_imgmsg(self.estimator.get_closest_person_face(color, depth))
             response = self.face_id.learn_face(face, request.name)
             return response
         except CvBridgeError as e:

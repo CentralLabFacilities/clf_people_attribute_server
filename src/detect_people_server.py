@@ -61,11 +61,14 @@ class ShirtColor:
         bin_colors["blue"] = 0
         bin_colors["purple"] = 0
 
-        GRID_SIZE = np.floor(crop_img.cols / 10)
+        cols = int(crop_img.shape[0])
+        rows = int(crop_img.shape[1])
 
-        for y in range(0, crop_img.rows - GRID_SIZE, GRID_SIZE):
-            for x in range(0, crop_img.cols - GRID_SIZE, GRID_SIZE):
-                mask = cv2.zeros(crop_img.size, cv2.CV_8UC1)
+        GRID_SIZE = int(np.floor(cols / 10))
+
+        for y in range(0, rows - GRID_SIZE, GRID_SIZE):
+            for x in range(0, cols - GRID_SIZE, GRID_SIZE):
+                mask = np.full((crop_img.shape[0], crop_img.shape[1]), 0, dtype=np.uint8)
                 bin_colors[ShirtColor.get_pixel_color_type(cv2.mean(hsv_crop_img, mask))] += 1
 
         result_color = "no color"
@@ -123,7 +126,7 @@ class GenderAndAge:
         req = GenderAndAgeServiceRequest()
         req.objects = cropped_images
         resp = self.sc.call(req)
-        return resp.gender_and_age_list
+        return resp.gender_and_age_response.gender_and_age_list
 
 
 class FaceID:
@@ -143,7 +146,7 @@ class FaceID:
     def learn_face(self, cropped_image, name):
         response = LearnPersonResponse()
         req = LearnPersonImageRequest()
-        #req.roi = cropped_image
+        req.roi = cropped_image
         req.name = name
         r = self.learn_face_sc.call(req)
         response.success = r.success
@@ -161,15 +164,27 @@ class Helper:
 
     @staticmethod
     def head_roi(image, person):
-        l_ear = person.body_parts[body_parts.index('LeftEar')]
-        r_ear = person.body_parts[body_parts.index('RightEar')]
-        print(l_ear)
-        print(r_ear)
-        return image  # TODO: IMPLEMENT CORRECTLY
+        # int amount = ceil(person.Nose.confidence) + ceil(person.REar.confidence) + ceil(person.REye.confidence) +
+        # ceil(person.LEar.confidence) + ceil(person.LEye.confidence);
+        parts = ['Nose', 'RightEar,']
+        # TODO: IMPLEMENT CORRECTLY
+        x = 332
+        y = 69
+        w = 100
+        h = 100
+
+        return image[y:y+h, x:x+w]
 
     @staticmethod
     def upper_body_roi(image, person):
-        return image  # TODO: IMPLEMENT CORRECTLY
+        width = image.shape[0]
+        height = image.shape[1]
+        # TODO: IMPLEMENT CORRECTLY
+        x = 50
+        y = 50
+        w = 100
+        h = 100
+        return image[y:y+h, x:x+w]
 
     @staticmethod
     def get_posture_and_gesture(person):
@@ -200,34 +215,64 @@ class PoseEstimator:
 
     def get_person_attributes(self, color, depth):
 
+        w = color.shape[0]
+        h = color.shape[1]
         acquired = self.tf_lock.acquire(False)
         if not acquired:
             return
 
         try:
             ts = rospy.Time.now()
-            humans = self.pose_estimator.inference(color, resize_to_default=True, upsample_size=self.resize_out_ratio)
-            print('timing: %r' % (rospy.Time.now()-ts).to_sec())
+            humans = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
+                                                                       upsample_size=self.resize_out_ratio), w, h)
+            print('timing tf_pose: %r' % (rospy.Time.now()-ts).to_sec())
         finally:
             self.tf_lock.release()
 
         persons = []
+        faces = []
         for human in humans:
             person = PersonAttributes()
             # Helper.get_posture_and_gesture(human)
             face = self.cv_bridge.cv2_to_imgmsg(Helper.head_roi(color, human), "bgr8")
-            # person.shirtcolor = ShirtColor.get_shirt_color(Helper.upper_body_roi(color, human))
-            if self.gender_age is not None and self.gender_age.initialized:
-                pass
-                # GenderAndAge.get_gender_and_age(face)
+            person.shirtcolor = ShirtColor.get_shirt_color(Helper.upper_body_roi(color, human))
+            faces.append(face)
             if self.face_id is not None and self.face_id.initialized:
+                ts = rospy.Time.now()
                 person.name = self.face_id.get_name(face)
+                print('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
             persons.append(person)
+        if self.gender_age is not None and self.gender_age.initialized:
+            ts = rospy.Time.now()
+            g_a = self.gender_age.get_genders_and_ages(faces)
+            print('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
+            for i in range(0, len(persons)):
+                persons[i].gender_hyp = g_a[i].gender_probability
+                persons[i].age_hyp = g_a[i].age_probability
+
         print(persons)
         return persons
 
     def get_closest_person_face(self, color, depth):
-        attributes = self.get_person_attributes(color, depth)
-        #filter closest
-        pass
+        persons = self.get_person_attributes(color, depth)
+        # TODO: filter closest
+        return Helper.head_roi(color, persons[0])
 
+    @staticmethod
+    def humans_to_dict(humans, w, h):
+        persons = []
+        for human in humans:
+            person = {}
+            for part in body_parts:
+                try:
+                    body_part = human.body_parts[body_parts.index(part)]
+                    person[part] = {part: {'confidence': body_part.score,
+                                           'x': body_part.x * w,
+                                           'y': body_part.y * h}}
+                except KeyError:
+                    person[part] = {part: {'confidence': 0.0,
+                                           'x': 0,
+                                           'y': 0}}
+                # print(person[part])
+            persons.append(person)
+        return persons
