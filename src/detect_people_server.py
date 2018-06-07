@@ -9,16 +9,10 @@ from threading import Lock
 from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage, \
     DoIKnowThatPersonImageRequest, LearnPersonResponse, LearnPersonImageRequest
 from gender_and_age_msgs.srv import GenderAndAgeService, GenderAndAgeServiceRequest
-from openpose_ros_msgs.msg import PersonAttributes
-
-from cv_bridge import CvBridge, CvBridgeError
-from std_msgs.msg import String
-from sensor_msgs.msg import Image
-from tfpose_ros.msg import Persons, Person, BodyPartElm
+from openpose_ros_msgs.msg import PersonAttributesWithPose
 
 from tf_pose.estimator import TfPoseEstimator
 from tf_pose.networks import model_wh, get_graph_path
-from tfpose_ros.msg import Persons, Person, BodyPartElm
 
 body_parts = ['Nose',
               'Neck',
@@ -65,10 +59,11 @@ class ShirtColor:
         rows = int(crop_img.shape[1])
 
         GRID_SIZE = int(np.floor(cols / 10))
-
+        CV_FILLED = -1
         for y in range(0, rows - GRID_SIZE, GRID_SIZE):
             for x in range(0, cols - GRID_SIZE, GRID_SIZE):
                 mask = np.full((crop_img.shape[0], crop_img.shape[1]), 0, dtype=np.uint8)
+                cv2.rectangle(mask, (x, y), (x+GRID_SIZE, y+GRID_SIZE), 255, CV_FILLED)
                 bin_colors[ShirtColor.get_pixel_color_type(cv2.mean(hsv_crop_img, mask))] += 1
 
         result_color = "no color"
@@ -87,8 +82,6 @@ class ShirtColor:
         H = hsv_val[0]
         S = hsv_val[1]
         V = hsv_val[2]
-
-        color = "no color"
 
         if V < 75:
             color = "black"
@@ -112,7 +105,6 @@ class ShirtColor:
             color = "purple"
         else:
             color = "red"
-
         return color
 
 
@@ -164,10 +156,20 @@ class Helper:
 
     @staticmethod
     def head_roi(image, person):
-        # int amount = ceil(person.Nose.confidence) + ceil(person.REar.confidence) + ceil(person.REye.confidence) +
-        # ceil(person.LEar.confidence) + ceil(person.LEye.confidence);
-        parts = ['Nose', 'RightEar,']
+        parts = ['Nose', 'RightEar', 'RightEye', 'LeftEar', 'LeftEye']
+        amount = int(sum([np.ceil(person[p]['confidence']) for p in parts]))
+        if amount <= 1:
+            x = y = w = h = -1
+            return image[y:y+h, x:x+w]
+
+        vf = sum([np.ceil(person[p]['y']) for p in parts])
+        v = int(np.floor(vf/amount))
+
         # TODO: IMPLEMENT CORRECTLY
+        # .... continue with
+        # https://github.com/CentralLabFacilities/openpose_ros/blob/pepper_dev/openpose_ros/src/detect_people_server.cpp
+        # from line 994
+
         x = 332
         y = 69
         w = 100
@@ -177,13 +179,17 @@ class Helper:
 
     @staticmethod
     def upper_body_roi(image, person):
-        width = image.shape[0]
-        height = image.shape[1]
+        parts = ['LeftHip', 'RightHip,', 'LeftShoulder', 'RightShoulder', 'LeftEye']
+
         # TODO: IMPLEMENT CORRECTLY
-        x = 50
-        y = 50
-        w = 100
-        h = 100
+        # .... continue with
+        # https://github.com/CentralLabFacilities/openpose_ros/blob/pepper_dev/openpose_ros/src/detect_people_server.cpp
+        # from line 780
+
+        x = 317
+        y = 229
+        w = 40
+        h = 40
         return image[y:y+h, x:x+w]
 
     @staticmethod
@@ -225,32 +231,35 @@ class PoseEstimator:
             ts = rospy.Time.now()
             humans = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
                                                                        upsample_size=self.resize_out_ratio), w, h)
-            print('timing tf_pose: %r' % (rospy.Time.now()-ts).to_sec())
+            rospy.loginfo('timing tf_pose: %r' % (rospy.Time.now()-ts).to_sec())
         finally:
             self.tf_lock.release()
 
         persons = []
         faces = []
         for human in humans:
-            person = PersonAttributes()
+            person = PersonAttributesWithPose()
             # Helper.get_posture_and_gesture(human)
             face = self.cv_bridge.cv2_to_imgmsg(Helper.head_roi(color, human), "bgr8")
-            person.shirtcolor = ShirtColor.get_shirt_color(Helper.upper_body_roi(color, human))
+
+            ts = rospy.Time.now()
+            person.attributes.shirtcolor = ShirtColor.get_shirt_color(Helper.upper_body_roi(color, human))
+            rospy.loginfo('timing shirt_color: %r' % (rospy.Time.now() - ts).to_sec())
             faces.append(face)
             if self.face_id is not None and self.face_id.initialized:
                 ts = rospy.Time.now()
-                person.name = self.face_id.get_name(face)
-                print('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
+                person.attributes.name = self.face_id.get_name(face)
+                rospy.loginfo('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
             persons.append(person)
         if self.gender_age is not None and self.gender_age.initialized:
             ts = rospy.Time.now()
             g_a = self.gender_age.get_genders_and_ages(faces)
-            print('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
+            rospy.loginfo('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
             for i in range(0, len(persons)):
-                persons[i].gender_hyp = g_a[i].gender_probability
-                persons[i].age_hyp = g_a[i].age_probability
+                persons[i].attributes.gender_hyp = g_a[i].gender_probability
+                persons[i].attributes.age_hyp = g_a[i].age_probability
 
-        print(persons)
+        rospy.loginfo(persons)
         return persons
 
     def get_closest_person_face(self, color, depth):
@@ -266,13 +275,13 @@ class PoseEstimator:
             for part in body_parts:
                 try:
                     body_part = human.body_parts[body_parts.index(part)]
-                    person[part] = {part: {'confidence': body_part.score,
-                                           'x': body_part.x * w,
-                                           'y': body_part.y * h}}
+                    person[part] = {'confidence': body_part.score,
+                                    'x': body_part.x * w,
+                                    'y': body_part.y * h}
                 except KeyError:
-                    person[part] = {part: {'confidence': 0.0,
-                                           'x': 0,
-                                           'y': 0}}
+                    person[part] = {'confidence': 0.0,
+                                    'x': 0,
+                                    'y': 0}
                 # print(person[part])
             persons.append(person)
         return persons

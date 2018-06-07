@@ -2,7 +2,7 @@
 import rospy
 from detect_people_server import FaceID, GenderAndAge, PoseEstimator
 from pepper_clf_msgs.srv import DepthAndColorImage
-from openpose_ros_msgs.srv import GetCrowdAttributes, GetCrowdAttributesResponse
+from openpose_ros_msgs.srv import GetCrowdAttributesWithPose, GetCrowdAttributesWithPoseResponse
 from clf_perception_vision_msgs.srv import LearnPerson
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -20,7 +20,7 @@ class PeopleAttributeServer:
         rospy.init_node('people_attribute_server')
 
         self.image_grabber = rospy.ServiceProxy(self.image_topic, DepthAndColorImage)
-        self.crowd_service = rospy.Service(self.crowd_topic, GetCrowdAttributes, self.detect_crowd)
+        self.crowd_service = rospy.Service(self.crowd_topic, GetCrowdAttributesWithPose, self.detect_crowd)
         self.learn_service = rospy.Service(self.learn_topic, LearnPerson, self.learn_face)
 
         self.face_id = FaceID(self.face_know_topic, self.face_learn_topic)
@@ -31,12 +31,13 @@ class PeopleAttributeServer:
         rospy.loginfo('pose_estimator ready')
 
     def detect_crowd(self, request):
-        response = GetCrowdAttributesResponse()
+        response = GetCrowdAttributesWithPoseResponse()
         image = self.image_grabber.call()
         try:
             color = self.cv_bridge.imgmsg_to_cv2(image.color, "bgr8")
             depth = self.cv_bridge.imgmsg_to_cv2(image.depth, "32FC1")
-            response.attributes = self.estimator.get_person_attributes(color, depth)
+            persons = self.estimator.get_person_attributes(color, depth)
+            response.attributes = persons
             return response
         except CvBridgeError as e:
             rospy.logerr('[tf-pose-estimation] Converting Image Error. ' + str(e))
