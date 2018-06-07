@@ -1,4 +1,6 @@
 import rospy
+import cv2
+import numpy as np
 from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage
 from gender_and_age_msgs.srv import GenderAndAgeService
 
@@ -16,12 +18,72 @@ class ShirtColor:
         pass
 
     @staticmethod
-    def get_shirt_color(cropped_image):
-        pass
+    def get_shirt_color(crop_img):
+
+        hsv_crop_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
+        bin_colors = dict()
+
+        bin_colors["white"] = 0
+        bin_colors["black"] = 0
+        bin_colors["grey"] = 0
+        bin_colors["red"] = 0
+        bin_colors["orange"] = 0
+        bin_colors["yellow"] = 0
+        bin_colors["green"] = 0
+        bin_colors["cyan"] = 0
+        bin_colors["blue"] = 0
+        bin_colors["purple"] = 0
+
+        GRID_SIZE = np.floor(crop_img.cols / 10)
+
+        for y in range(0, crop_img.rows - GRID_SIZE, GRID_SIZE):
+            for x in range(0, crop_img.cols - GRID_SIZE, GRID_SIZE):
+                mask = cv2.zeros(crop_img.size, cv2.CV_8UC1)
+                bin_colors[ShirtColor.get_pixel_color_type(cv2.mean(hsv_crop_img, mask))] += 1
+
+        result_color = "no color"
+        max_bin_count = 0
+
+        for key, value in bin_colors.iteritems():
+            if max_bin_count < value:
+                result_color = key
+                max_bin_count = value
+
+        return result_color
 
     @staticmethod
-    def get_pixel_color_type(pixel):
-        pass
+    def get_pixel_color_type(hsv_val):
+
+        H = hsv_val[0]
+        S = hsv_val[1]
+        V = hsv_val[2]
+
+        color = "no color"
+
+        if V < 75:
+            color = "black"
+        elif V > 190 and S < 27:
+            color = "white"
+        elif S < 53 and V < 185:
+            color = "grey"
+        elif H < 14:
+            color = "red"
+        elif H < 25:
+            color = "orange"
+        elif H < 34:
+            color = "yellow"
+        elif H < 73:
+            color = "green"
+        elif H < 102:
+            color = "cyan"
+        elif H < 127:
+            color = "blue"
+        elif H < 149:
+            color = "purple"
+        else:
+            color = "red"
+
+        return color
 
 
 class GenderAndAge:
