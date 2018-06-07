@@ -1,6 +1,10 @@
 import rospy
+import rospkg
+import sys
+import os
 import cv2
 import numpy as np
+from threading import Lock
 from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage
 from gender_and_age_msgs.srv import GenderAndAgeService
 
@@ -127,10 +131,45 @@ class Helper:
 
 class PoseEstimator:
     def __init__(self):
-        pass
 
-    def get_persons(self, color, depth):
+        model = rospy.get_param('~model', 'cmu')
+        resolution = rospy.get_param('~resolution', '432x368')
+        self.resize_out_ratio = float(rospy.get_param('~resize_out_ratio', '4.0'))
+        self.tf_lock = Lock()
+
+        try:
+            w, h = model_wh(resolution)
+            graph_path = get_graph_path(model)
+            rospack = rospkg.RosPack()
+            graph_path = os.path.join(rospack.get_path('tfpose_ros'), graph_path)
+        except Exception as e:
+            rospy.logerr('invalid model: %s, e=%s' % (model, e))
+            sys.exit(-1)
+
+        self.pose_estimator = TfPoseEstimator(graph_path, target_size=(w, h))
+
+    @staticmethod
+    def get_humans(self, color):
+
+        acquired = self.tf_lock.acquire(False)
+        if not acquired:
+            return
+
+        try:
+            humans = self.pose_estimator.inference(color, resize_to_default=True, upsample_size=self.resize_out_ratio)
+        finally:
+            self.tf_lock.release()
+
+        return humans
+
+    def get_person_attributes(self, color, depth):
+
+        humans = self.get_humans(color)
+
         pass
 
     def get_closest_person_face(self, color, depth):
+
+        humans = self.get_humans(color)
+
         pass
