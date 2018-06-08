@@ -286,9 +286,9 @@ class Helper:
 
     @staticmethod
     def get_posture_and_gesture(person):
-        posture = "standing"
-        gesture = "neutral"
-        return {'posture': posture, 'gesture': gesture}
+        posture = 2  # 2 = standing
+        gestures = [6]  # 6 = neutral
+        return {'posture': posture, 'gestures': gestures}
 
 
 class PoseEstimator:
@@ -334,9 +334,9 @@ class PoseEstimator:
         for human in humans:
             person = PersonAttributesWithPose()
 
-            pg = Helper.get_posture_and_gesture(human)
+            pg = Helper.get_posture_and_gestures(human)
             person.attributes.posture = pg['posture']
-            person.attributes.gesture = pg['gesture']
+            person.attributes.gestures = pg['gesture']
 
             face = self.cv_bridge.cv2_to_imgmsg(Helper.head_roi(color, human), "bgr8")
             faces.append(face)
