@@ -158,43 +158,137 @@ class Helper:
     def head_roi(image, person):
         parts = ['Nose', 'RightEar', 'RightEye', 'LeftEar', 'LeftEye']
         amount = int(sum([np.ceil(person[p]['confidence']) for p in parts]))
+        vf = sum([np.ceil(person[p]['y']) for p in parts])
+        v = int(np.floor(vf/amount))
+
         if amount <= 1:
             x = y = w = h = -1
             return image[y:y+h, x:x+w]
 
-        vf = sum([np.ceil(person[p]['y']) for p in parts])
-        v = int(np.floor(vf/amount))
+        distlist_x = []
+        if person['Nose']['x'] != 0:
+            distlist_x.push_back(np.abs(person['Nose']['x']))
+        if person['RightEar']['x'] != 0:
+            distlist_x.push_back(np.abs(person['RightEar']['x']))
+        if person['RightEye']['x'] != 0:
+            distlist_x.push_back(np.abs(person['RightEye']['x']))
+        if person['LeftEar']['x'] != 0:
+            distlist_x.push_back(np.abs(person['LeftEar']['x']))
+        if person['LeftEye']['x'] != 0:
+            distlist_x.push_back(np.abs(person['LeftEye']['x']))
 
-        # TODO: IMPLEMENT CORRECTLY
-        # .... continue with
-        # https://github.com/CentralLabFacilities/openpose_ros/blob/pepper_dev/openpose_ros/src/detect_people_server.cpp
-        # from line 994
+        max_dist_u = np.amax(distlist_x)
 
-        x = 332
-        y = 69
-        w = 100
-        h = 100
+        min_dist_u = np.amin(distlist_x)
+
+        x = min_dist_u
+        w = max_dist_u - min_dist_u
+        h = w * 1.5
+        y = v - h / 2
+
+        if (x + w >= image.shape[0]):
+            w = w - np.abs((x + w) - image.shape[0])
+        if (y + h >= image.shape[1]):
+            h = h - np.abs((y + h) - image.shape[1])
 
         return image[y:y+h, x:x+w]
 
     @staticmethod
     def upper_body_roi(image, person):
-        parts = ['LeftHip', 'RightHip,', 'LeftShoulder', 'RightShoulder', 'LeftEye']
+        parts = ['LeftShoulder', 'RightShoulder', 'LeftHip', 'RightHip,']
+        amount = int(sum([np.ceil(person[p]['confidence']) for p in parts]))
 
-        # TODO: IMPLEMENT CORRECTLY
-        # .... continue with
-        # https://github.com/CentralLabFacilities/openpose_ros/blob/pepper_dev/openpose_ros/src/detect_people_server.cpp
-        # from line 780
+        if amount <= 1:
+            x = y = w = h = -1
+            return image[y:y+h, x:x+w]
 
-        x = 317
-        y = 229
-        w = 40
-        h = 40
+        if person['LeftShoulder']['confidence'] > 0 and person['RightShoulder']['confidence'] > 0:
+            y = person['RightShoulder']['y']
+            w = np.abs(person['LeftShoulder']['y'] - person['RightShoulder']['x'])
+            if (person['RightShoulder']['x'] - person['LeftShoulder']['x']) < 0:
+                x = person['RightShoulder']['x']
+            else:
+                x = person['LeftShoulder']['x']
+
+            if person['RightHip']['confidence'] > 0:
+                h = (person['RightHip']['y'] - y)
+            elif (person['LeftHip']['confidence'] > 0):
+                h = (person['LeftHip']['y'] - y)
+            else:
+                rospy.logerr("no hip found")
+                h = w
+        else:
+            if (person['RightHip']['confidence'] > 0 and person['LeftHip']['confidence'] > 0):
+                if ((person['RightShoulder']['confidence'] > 0) ^ (person['LeftShoulder']['confidence'] > 0)):
+                    w = np.abs(person['LeftHip']['x'] - person['RightHip']['x'])
+                    y = person['LeftShoulder']['y'] + person['RightShoulder']['y']
+                    if ((person['RightHip']['x'] - person['LeftHip']['x']) < 0):
+                        x = person['RightHip']['x']
+                        h = person['RightHip']['y'] - person['LeftShoulder']['x'] - person['RightShoulder']['x'] #one of the shoulders values will be 0.
+                    else:
+                        x = person['LeftHip']['x']
+                        h = person['LeftHip']['y'] - person['LeftShoulder']['x'] - person['RightShoulder']['x']
+                else:
+                    w = np.abs(person['LeftHip']['x'] - person['RightHip']['x'])
+                    if ((person['RightHip']['x'] - person['LeftHip']['x']) < 0):
+                        x = person['RightHip']['x']
+                        h = w
+                        y = person['RightHip']['y'] - h
+                    else:
+                        x = person['LeftHip']['x']
+                        h = w
+                        y = person['LeftHip']['y'] - h
+            else:
+                if (person['RightHip']['confidence'] > 0):
+                    if (person['RightShoulder']['confidence'] > 0):
+                        x = person['RightShoulder']['x']
+                        y = person['RightShoulder']['y']
+                        h = np.abs(person['RightShoulder']['y'] - person['RightHip']['y'])
+                        w = h * 0.5
+                    
+                    if (person['LeftShoulder']['confidence'] > 0):
+                        x = person['RightHip']['x']
+                        y = person['LeftShoulder']['y']
+                        h = np.abs(person['LeftShoulder']['y'] - person['RightHip']['y'])
+                        w = np.abs(person['LeftShoulder']['x'] - person['RightHip']['x'])
+                if (person['LeftHip']['confidence'] > 0):
+                    if (person['RightShoulder']['confidence'] > 0):
+                        x = person['RightShoulder']['x']
+                        y = person['RightShoulder']['y']
+                        h = np.abs(person['RightShoulder']['y'] - person['LeftHip']['y'])
+                        w = h * 0.5
+                    
+                    if (person['LeftShoulder']['confidence'] > 0):
+                        y = person['LeftShoulder']['y']
+                        h = np.abs(person['LeftShoulder']['y'] - person['LeftHip']['y'])
+                        w = h * 0.5
+                        x = person['LeftShoulder']['x'] - w
+                else:
+                    rospy.log("No BB possible: RShoulder['confidence'] %f, LShoulder['confidence'] %f,"
+                              " RHip['confidence'] %f, LHip['confidence'] %f \n",
+                              person['RightShoulder']['confidence'], person['LeftShoulder']['confidence'], person['RightHip']['confidence'],
+                              person['LeftHip']['confidence'])
+
+                
+        
+            
+
+        if (x + w >= image.shape[0]):
+            w = w - np.abs((x + w) - image.shape[0])
+        if (y + h >= image.shape[1]):
+            h = h - np.abs((y + h) - image.shape[1])
+
+        if ((w <= 0) or (h <= 0) or (x <= 0) or (y <= 0)):
+            rospy.log("w or h <= 0")
+            x = y = w = h = 0
+
         return image[y:y+h, x:x+w]
 
     @staticmethod
     def get_posture_and_gesture(person):
-        pass
+        posture = "standing"
+        gesture = "neutral"
+        return {'posture': posture, 'gesture': gesture}
 
 
 class PoseEstimator:
@@ -239,22 +333,30 @@ class PoseEstimator:
         faces = []
         for human in humans:
             person = PersonAttributesWithPose()
-            # Helper.get_posture_and_gesture(human)
+
+            pg = Helper.get_posture_and_gesture(human)
+            person.attributes.posture = pg['posture']
+            person.attributes.gesture = pg['gesture']
+
             face = self.cv_bridge.cv2_to_imgmsg(Helper.head_roi(color, human), "bgr8")
+            faces.append(face)
 
             ts = rospy.Time.now()
             person.attributes.shirtcolor = ShirtColor.get_shirt_color(Helper.upper_body_roi(color, human))
             rospy.loginfo('timing shirt_color: %r' % (rospy.Time.now() - ts).to_sec())
-            faces.append(face)
+
             if self.face_id is not None and self.face_id.initialized:
                 ts = rospy.Time.now()
                 person.attributes.name = self.face_id.get_name(face)
                 rospy.loginfo('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
+
             persons.append(person)
+
         if self.gender_age is not None and self.gender_age.initialized:
             ts = rospy.Time.now()
             g_a = self.gender_age.get_genders_and_ages(faces)
             rospy.loginfo('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
+
             for i in range(0, len(persons)):
                 persons[i].attributes.gender_hyp = g_a[i].gender_probability
                 persons[i].attributes.age_hyp = g_a[i].age_probability
