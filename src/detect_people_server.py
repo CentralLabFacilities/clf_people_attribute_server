@@ -167,15 +167,15 @@ class Helper:
 
         distlist_x = []
         if person['Nose']['x'] != 0:
-            distlist_x.push_back(np.abs(person['Nose']['x']))
+            distlist_x.append(np.abs(person['Nose']['x']))
         if person['RightEar']['x'] != 0:
-            distlist_x.push_back(np.abs(person['RightEar']['x']))
+            distlist_x.append(np.abs(person['RightEar']['x']))
         if person['RightEye']['x'] != 0:
-            distlist_x.push_back(np.abs(person['RightEye']['x']))
+            distlist_x.append(np.abs(person['RightEye']['x']))
         if person['LeftEar']['x'] != 0:
-            distlist_x.push_back(np.abs(person['LeftEar']['x']))
+            distlist_x.append(np.abs(person['LeftEar']['x']))
         if person['LeftEye']['x'] != 0:
-            distlist_x.push_back(np.abs(person['LeftEye']['x']))
+            distlist_x.append(np.abs(person['LeftEye']['x']))
 
         max_dist_u = np.amax(distlist_x)
 
@@ -191,11 +191,11 @@ class Helper:
         if (y + h >= image.shape[1]):
             h = h - np.abs((y + h) - image.shape[1])
 
-        return image[y:y+h, x:x+w]
+        return image[int(y):int(y+h), int(x):int(x+w)]
 
     @staticmethod
     def upper_body_roi(image, person):
-        parts = ['LeftShoulder', 'RightShoulder', 'LeftHip', 'RightHip,']
+        parts = ['LeftShoulder', 'RightShoulder', 'LeftHip', 'RightHip']
         amount = int(sum([np.ceil(person[p]['confidence']) for p in parts]))
 
         if amount <= 1:
@@ -282,10 +282,10 @@ class Helper:
             rospy.log("w or h <= 0")
             x = y = w = h = 0
 
-        return image[y:y+h, x:x+w]
+        return image[int(y):int(y+h), int(x):int(x+w)]
 
     @staticmethod
-    def get_posture_and_gesture(person):
+    def get_posture_and_gestures(person):
         posture = 2  # 2 = standing
         gestures = [6]  # 6 = neutral
         return {'posture': posture, 'gestures': gestures}
@@ -336,7 +336,7 @@ class PoseEstimator:
 
             pg = Helper.get_posture_and_gestures(human)
             person.attributes.posture = pg['posture']
-            person.attributes.gestures = pg['gesture']
+            person.attributes.gestures = pg['gestures']
 
             face = self.cv_bridge.cv2_to_imgmsg(Helper.head_roi(color, human), "bgr8")
             faces.append(face)
