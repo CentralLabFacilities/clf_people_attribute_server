@@ -10,6 +10,8 @@ from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonIm
     DoIKnowThatPersonImageRequest, LearnPersonResponse, LearnPersonImageRequest
 from gender_and_age_msgs.srv import GenderAndAgeService, GenderAndAgeServiceRequest
 from openpose_ros_msgs.msg import PersonAttributesWithPose
+from sensor_msgs.msg import CameraInfo
+from geometry_msgs.msg import Point
 
 from tf_pose.estimator import TfPoseEstimator
 from tf_pose.networks import model_wh, get_graph_path
@@ -147,12 +149,56 @@ class FaceID:
 
 
 class Helper:
-    def __init__(self):
-        pass
+    def __init__(self, depth_info_topic='/pepper_robot/camera/depth/camera_info'):
+        self.depth_sub = rospy.Subscriber(depth_info_topic,
+                                          CameraInfo, self.camera_info_callback)
+        self.cx = None
+        self.cy = None
+        self.fx = None
+        self.fy = None
 
-    @staticmethod
-    def depth_lookup(image, x, y, cx, cy, fx, fy):
-        pass
+    def camera_info_callback(self, msg):
+        self.fx = msg.K[0]
+        self.cx = msg.K[2]
+        self.fy = msg.K[4]
+        self.cy = msg.K[5]
+        self.depth_sub.unregister()
+
+    def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh):
+        w_factor = (float(depth_image.shape[1]) / float(color_image.shape[1]))
+        h_factor = (float(depth_image.shape[0]) / float(color_image.shape[0]))
+        x = crx * w_factor
+        y = cry * h_factor
+        w = crw * w_factor
+        h = crh * h_factor
+
+        is_in_mm = depth_image.dtype == 'uint16'
+        unit_scaling = 1000.0 if is_in_mm else 1.0
+        constant_x = unit_scaling / self.fx
+        constant_y = unit_scaling / self.fy
+
+        # TODO: better sampling
+        samples = \
+            [
+                (x + (w * 0.50), y + (h * 0.25)),  # top
+                (x + (w * 0.25), y + (h * 0.50)),  # left
+                (x + (w * 0.50), y + (h * 0.50)),  # center
+                (x + (w * 0.75), y + (h * 0.50)),  # right
+                (x + (w * 0.50), y + (h * 0.75)),  # bottom
+            ]
+
+        values = []
+        for sample in samples:
+            value = depth_image[int(sample[1]), int(sample[0])]
+            values.append(value)
+
+        depth = np.median(values)
+        point = Point()
+
+        point.x = (float(x)-self.cx) * depth * constant_x
+        point.y = (float(x)-self.cy) * depth * constant_y
+        point.z = depth * unit_scaling
+        return point
 
     @staticmethod
     def head_roi(image, person):
@@ -191,7 +237,7 @@ class Helper:
         if (y + h >= image.shape[0]):
             h = h - np.abs((y + h) - image.shape[0])
 
-        return image[int(y):int(y+h), int(x):int(x+w)]
+        return image[int(y):int(y+h), int(x):int(x+w)], x, y, w, h
 
     @staticmethod
     def upper_body_roi(image, person):
@@ -269,9 +315,6 @@ class Helper:
                               person['RightShoulder']['confidence'], person['LeftShoulder']['confidence'], person['RightHip']['confidence'],
                               person['LeftHip']['confidence'])
 
-                
-        
-            
 
         if (x + w >= image.shape[1]):
             w = w - np.abs((x + w) - image.shape[0])
@@ -282,7 +325,7 @@ class Helper:
             rospy.log("w or h <= 0")
             x = y = w = h = 0
 
-        return image[int(y):int(y+h), int(x):int(x+w)]
+        return image[int(y):int(y+h), int(x):int(x+w)], x, y, w, h
 
     @staticmethod
     def get_posture_and_gestures(person):
@@ -301,6 +344,7 @@ class PoseEstimator:
         self.gender_age = gender_age
         self.cv_bridge = cv_bridge
         self.tf_lock = Lock()
+        self.helper = Helper()
 
         try:
             w, h = model_wh(resolution)
@@ -313,14 +357,14 @@ class PoseEstimator:
 
         self.pose_estimator = TfPoseEstimator(graph_path, target_size=(w, h))
 
-    def get_person_attributes(self, color, depth):
+    def get_person_attributes(self, color, depth, do_gender_age=False, do_face_id=False):
 
         w = color.shape[1]
         h = color.shape[0]
         acquired = self.tf_lock.acquire(False)
-        cv2.imshow('image', color)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        #cv2.imshow('image', color)
+        #cv2.waitKey(0)
+        #cv2.destroyAllWindows()
         if not acquired:
             return
 
@@ -341,21 +385,26 @@ class PoseEstimator:
             person.attributes.posture = pg['posture']
             person.attributes.gestures = pg['gestures']
 
-            face = self.cv_bridge.cv2_to_imgmsg(Helper.head_roi(color, human), "bgr8")
-            faces.append(face)
+            f_roi, fx, fy, fw, fh = Helper.head_roi(color, human)
+            b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, human)
 
+            head_pose = self.helper.depth_lookup(color, depth, fx, fy, fw, fh)
+            body_pose = self.helper.depth_lookup(color, depth, bx, by, bw, bh)
+
+            face = self.cv_bridge.cv2_to_imgmsg(f_roi, "bgr8")
+            faces.append(face)
             ts = rospy.Time.now()
-            person.attributes.shirtcolor = ShirtColor.get_shirt_color(Helper.upper_body_roi(color, human))
+            person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
             rospy.loginfo('timing shirt_color: %r' % (rospy.Time.now() - ts).to_sec())
 
-            if self.face_id is not None and self.face_id.initialized:
+            if do_face_id and self.face_id is not None and self.face_id.initialized:
                 ts = rospy.Time.now()
                 person.attributes.name = self.face_id.get_name(face)
                 rospy.loginfo('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
 
             persons.append(person)
 
-        if self.gender_age is not None and self.gender_age.initialized:
+        if do_gender_age and self.gender_age is not None and self.gender_age.initialized:
             ts = rospy.Time.now()
             g_a = self.gender_age.get_genders_and_ages(faces)
             rospy.loginfo('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
@@ -364,16 +413,16 @@ class PoseEstimator:
                 persons[i].attributes.gender_hyp = g_a[i].gender_probability
                 persons[i].attributes.age_hyp = g_a[i].age_probability
 
-        rospy.loginfo(persons)
-
-
-
+        # rospy.loginfo(persons)
         return persons
 
     def get_closest_person_face(self, color, depth):
-        persons = self.get_person_attributes(color, depth)
+        w = color.shape[1]
+        h = color.shape[0]
+        persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
+                                                                       upsample_size=self.resize_out_ratio), w, h)
         # TODO: filter closest
-        return Helper.head_roi(color, persons[0])
+        return Helper.head_roi(color, persons[0])[0]
 
     @staticmethod
     def humans_to_dict(humans, w, h):
@@ -386,9 +435,6 @@ class PoseEstimator:
                     person[part] = {'confidence': body_part.score,
                                     'x': body_part.x * w,
                                     'y': body_part.y * h}
-                    print("x: %r, w: %r, result> %r" % (body_part.x, w, body_part.x * w))
-                    print("y: %r, h: %r, result> %r" % (body_part.y, h, body_part.y * h))
-
                 except KeyError:
                     person[part] = {'confidence': 0.0,
                                     'x': 0,
