@@ -360,7 +360,8 @@ class PoseEstimator:
     def __init__(self, cv_bridge, face_id=None, gender_age=None):
 
         model = rospy.get_param('~model', 'mobilenet_thin')
-        resolution = rospy.get_param('~resolution', '432x368')
+        #resolution = rospy.get_param('~resolution', '432x368')
+        resolution = rospy.get_param('~resolution', '208x192')
         self.resize_out_ratio = float(rospy.get_param('~resize_out_ratio', '4.0'))
         self.face_id = face_id
         self.gender_age = gender_age
