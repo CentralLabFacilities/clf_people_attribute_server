@@ -191,6 +191,9 @@ class Helper:
         if (y + h >= image.shape[1]):
             h = h - np.abs((y + h) - image.shape[1])
 
+        cv2.imshow('head roi', image[int(y):int(y+h), int(x):int(x+w)])
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
         return image[int(y):int(y+h), int(x):int(x+w)]
 
     @staticmethod
@@ -282,6 +285,9 @@ class Helper:
             rospy.log("w or h <= 0")
             x = y = w = h = 0
 
+        cv2.imshow('body roi', image[int(y):int(y+h), int(x):int(x+w)])
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
         return image[int(y):int(y+h), int(x):int(x+w)]
 
     @staticmethod
@@ -318,6 +324,9 @@ class PoseEstimator:
         w = color.shape[0]
         h = color.shape[1]
         acquired = self.tf_lock.acquire(False)
+        cv2.imshow('image', color)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
         if not acquired:
             return
 
@@ -362,6 +371,9 @@ class PoseEstimator:
                 persons[i].attributes.age_hyp = g_a[i].age_probability
 
         rospy.loginfo(persons)
+
+
+
         return persons
 
     def get_closest_person_face(self, color, depth):
