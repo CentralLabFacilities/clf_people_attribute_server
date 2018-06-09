@@ -186,14 +186,11 @@ class Helper:
         h = w * 1.5
         y = v - h / 2
 
-        if (x + w >= image.shape[0]):
-            w = w - np.abs((x + w) - image.shape[0])
-        if (y + h >= image.shape[1]):
-            h = h - np.abs((y + h) - image.shape[1])
+        if (x + w >= image.shape[1]):
+            w = w - np.abs((x + w) - image.shape[1])
+        if (y + h >= image.shape[0]):
+            h = h - np.abs((y + h) - image.shape[0])
 
-        cv2.imshow('head roi', image[int(y):int(y+h), int(x):int(x+w)])
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
         return image[int(y):int(y+h), int(x):int(x+w)]
 
     @staticmethod
@@ -207,7 +204,7 @@ class Helper:
 
         if person['LeftShoulder']['confidence'] > 0 and person['RightShoulder']['confidence'] > 0:
             y = person['RightShoulder']['y']
-            w = np.abs(person['LeftShoulder']['y'] - person['RightShoulder']['x'])
+            w = np.abs(person['LeftShoulder']['x'] - person['RightShoulder']['x'])
             if (person['RightShoulder']['x'] - person['LeftShoulder']['x']) < 0:
                 x = person['RightShoulder']['x']
             else:
@@ -276,18 +273,15 @@ class Helper:
         
             
 
-        if (x + w >= image.shape[0]):
+        if (x + w >= image.shape[1]):
             w = w - np.abs((x + w) - image.shape[0])
-        if (y + h >= image.shape[1]):
+        if (y + h >= image.shape[0]):
             h = h - np.abs((y + h) - image.shape[1])
 
         if ((w <= 0) or (h <= 0) or (x <= 0) or (y <= 0)):
             rospy.log("w or h <= 0")
             x = y = w = h = 0
 
-        cv2.imshow('body roi', image[int(y):int(y+h), int(x):int(x+w)])
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
         return image[int(y):int(y+h), int(x):int(x+w)]
 
     @staticmethod
@@ -321,8 +315,8 @@ class PoseEstimator:
 
     def get_person_attributes(self, color, depth):
 
-        w = color.shape[0]
-        h = color.shape[1]
+        w = color.shape[1]
+        h = color.shape[0]
         acquired = self.tf_lock.acquire(False)
         cv2.imshow('image', color)
         cv2.waitKey(0)
@@ -392,6 +386,9 @@ class PoseEstimator:
                     person[part] = {'confidence': body_part.score,
                                     'x': body_part.x * w,
                                     'y': body_part.y * h}
+                    print("x: %r, w: %r, result> %r" % (body_part.x, w, body_part.x * w))
+                    print("y: %r, h: %r, result> %r" % (body_part.y, h, body_part.y * h))
+
                 except KeyError:
                     person[part] = {'confidence': 0.0,
                                     'x': 0,
