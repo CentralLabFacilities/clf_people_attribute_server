@@ -10,7 +10,7 @@ from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonIm
     DoIKnowThatPersonImageRequest, LearnPersonResponse, LearnPersonImageRequest
 from gender_and_age_msgs.srv import GenderAndAgeService, GenderAndAgeServiceRequest
 from openpose_ros_msgs.msg import PersonAttributesWithPose
-from sensor_msgs.msg import CameraInfo
+from sensor_msgs.msg import CameraInfo, Image
 from geometry_msgs.msg import PoseStamped
 
 from tf import TransformListener
@@ -368,6 +368,7 @@ class PoseEstimator:
         self.cv_bridge = cv_bridge
         self.tf_lock = Lock()
         self.helper = Helper()
+        self.result_pub = rospy.Publisher('/tf_pose/result', Image, queue_size=1)
 
         try:
             w, h = model_wh(resolution)
@@ -393,14 +394,19 @@ class PoseEstimator:
 
         try:
             ts = rospy.Time.now()
-            humans = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
-                                                                       upsample_size=self.resize_out_ratio), w, h)
+            result = self.pose_estimator.inference(color, resize_to_default=True,
+                                                                       upsample_size=self.resize_out_ratio)
+            humans = self.humans_to_dict(result, w, h)
             rospy.loginfo('timing tf_pose: %r' % (rospy.Time.now() - ts).to_sec())
         finally:
             self.tf_lock.release()
 
         persons = []
         faces = []
+
+        res_img = TfPoseEstimator.draw_humans(color, result, imgcopy=False)
+        self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img))
+
         for human in humans:
             person = PersonAttributesWithPose()
 
