@@ -4,7 +4,7 @@ import sys
 import os
 import cv2
 import numpy as np
-from threading import Lock
+from threading import Lock, Thread
 
 from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage, \
     DoIKnowThatPersonImageRequest, LearnPersonResponse, LearnPersonImageRequest
@@ -116,13 +116,19 @@ class GenderAndAge:
     def __init__(self, topic):
         self.topic = topic
         self.sc = rospy.ServiceProxy(self.topic, GenderAndAgeService)
-        try:
-            rospy.wait_for_service(self.topic, 3.0)
-            self.initialized = True
-        except rospy.ROSException as e:
-            rospy.loginfo(e)
-            self.initialized = False
-        rospy.loginfo('<<< GenderAndAge: %r' % self.initialized)
+
+        def init_service():
+            try:
+                rospy.loginfo('wait for gender_age...')
+                rospy.wait_for_service(self.topic, 3.0)
+                self.initialized = True
+            except rospy.ROSException as e:
+                rospy.loginfo(e)
+                self.initialized = False
+            rospy.loginfo('<<< GenderAndAge: %r' % self.initialized)
+
+        t = Thread(target=init_service())
+        t.start()
 
     def get_genders_and_ages(self, cropped_images):
         req = GenderAndAgeServiceRequest()
@@ -137,13 +143,19 @@ class FaceID:
         self.classify_topic = classify_topic
         self.learn_face_sc = rospy.ServiceProxy(self.learn_topic, LearnPersonImage)
         self.get_face_name_sc = rospy.ServiceProxy(self.classify_topic, DoIKnowThatPersonImage)
-        try:
-            rospy.wait_for_service(self.classify_topic, 3.0)
-            self.initialized = True
-        except rospy.ROSException as e:
-            rospy.loginfo(e)
-            self.initialized = False
-        rospy.loginfo('<<< FaceID: %r' % self.initialized)
+
+        def init_service():
+            try:
+                rospy.loginfo('wait for face_id...')
+                rospy.wait_for_service(self.classify_topic, 3.0)
+                self.initialized = True
+            except rospy.ROSException as e:
+                rospy.loginfo(e)
+                self.initialized = False
+            rospy.loginfo('<<< FaceID: %r' % self.initialized)
+
+        t = Thread(target=init_service())
+        t.start()
 
     def get_name(self, cropped_image):
         req = DoIKnowThatPersonImageRequest()
@@ -191,6 +203,7 @@ class Helper:
         h = crh * h_factor
 
         is_in_mm = depth_image.dtype == 'uint16'
+        rospy.loginfo('depth_image_type: %r' % depth_image.dtype)
         unit_scaling = 1000.0 if is_in_mm else 1.0
         constant_x = unit_scaling / self.fx
         constant_y = unit_scaling / self.fy
@@ -476,7 +489,7 @@ class PoseEstimator:
         persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
                                                                     upsample_size=self.resize_out_ratio), w, h)
         # TODO: filter closest
-        return Helper.head_roi(color, persons[0])[0]
+        return self.helper.head_roi(color, persons[0])[0]
 
     def get_closest_person_body_roi(self, color, depth):
         w = color.shape[1]
@@ -484,7 +497,7 @@ class PoseEstimator:
         persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
                                                                     upsample_size=self.resize_out_ratio), w, h)
         # TODO: filter closest
-        roi = Helper.body_roi(color, persons[0])
+        roi = self.helper.upper_body_roi(color, persons[0])
         body_roi = RegionOfInterest()
         body_roi.x_offset = roi[1]
         body_roi.y_offset = roi[2]
