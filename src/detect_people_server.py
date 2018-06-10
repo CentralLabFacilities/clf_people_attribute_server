@@ -255,21 +255,21 @@ class Helper:
             x = y = w = h = -1
             return image[y:y + h, x:x + w]
 
-        distlist_x = []
+        dist_list_x = []
         if person['Nose']['x'] != 0:
-            distlist_x.append(np.abs(person['Nose']['x']))
+            dist_list_x.append(np.abs(person['Nose']['x']))
         if person['RightEar']['x'] != 0:
-            distlist_x.append(np.abs(person['RightEar']['x']))
+            dist_list_x.append(np.abs(person['RightEar']['x']))
         if person['RightEye']['x'] != 0:
-            distlist_x.append(np.abs(person['RightEye']['x']))
+            dist_list_x.append(np.abs(person['RightEye']['x']))
         if person['LeftEar']['x'] != 0:
-            distlist_x.append(np.abs(person['LeftEar']['x']))
+            dist_list_x.append(np.abs(person['LeftEar']['x']))
         if person['LeftEye']['x'] != 0:
-            distlist_x.append(np.abs(person['LeftEye']['x']))
+            dist_list_x.append(np.abs(person['LeftEye']['x']))
 
-        max_dist_u = np.amax(distlist_x)
+        max_dist_u = np.amax(dist_list_x)
 
-        min_dist_u = np.amin(distlist_x)
+        min_dist_u = np.amin(dist_list_x)
 
         x = min_dist_u
         w = max_dist_u - min_dist_u
@@ -356,10 +356,10 @@ class Helper:
                         x = person['LeftShoulder']['x'] - w
                 else:
                     rospy.loginfo("No BB possible: RShoulder['confidence'] %f, LShoulder['confidence'] %f,"
-                              " RHip['confidence'] %f, LHip['confidence'] %f \n",
-                              person['RightShoulder']['confidence'], person['LeftShoulder']['confidence'],
-                              person['RightHip']['confidence'],
-                              person['LeftHip']['confidence'])
+                                  " RHip['confidence'] %f, LHip['confidence'] %f \n",
+                                  person['RightShoulder']['confidence'], person['LeftShoulder']['confidence'],
+                                  person['RightHip']['confidence'],
+                                  person['LeftHip']['confidence'])
 
         if x + w >= image.shape[1]:
             w = w - np.abs((x + w) - image.shape[0])
@@ -367,7 +367,7 @@ class Helper:
             h = h - np.abs((y + h) - image.shape[1])
 
         if (w <= 0) or (h <= 0) or (x <= 0) or (y <= 0):
-            rospy.log("w or h <= 0")
+            rospy.loginfo("w or h <= 0")
             x = y = w = h = 0
 
         return image[int(y):int(y + h), int(x):int(x + w)], x, y, w, h
@@ -380,11 +380,10 @@ class Helper:
 
 
 class PoseEstimator:
-    def __init__(self, cv_bridge, face_id=None, gender_age=None):
+    def __init__(self, cv_bridge, face_id=None, gender_age=None, resolution='208x192', model='mobilenet_thin'):
 
-        model = rospy.get_param('~model', 'mobilenet_thin')
-        #resolution = rospy.get_param('~resolution', '432x368')
-        resolution = rospy.get_param('~resolution', '208x192')
+        model = rospy.get_param('~model', model)
+        resolution = rospy.get_param('~resolution', resolution)  # old: '432x368'
         self.resize_out_ratio = float(rospy.get_param('~resize_out_ratio', '4.0'))
         self.face_id = face_id
         self.gender_age = gender_age
@@ -409,16 +408,13 @@ class PoseEstimator:
         w = color.shape[1]
         h = color.shape[0]
         acquired = self.tf_lock.acquire(False)
-        # cv2.imshow('image', color)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
         if not acquired:
             return
 
         try:
             time_stamp = rospy.Time.now()
             result = self.pose_estimator.inference(color, resize_to_default=True,
-                                                                       upsample_size=self.resize_out_ratio)
+                                                   upsample_size=self.resize_out_ratio)
             humans = self.humans_to_dict(result, w, h)
             rospy.loginfo('timing tf_pose: %r' % (rospy.Time.now() - time_stamp).to_sec())
         finally:
@@ -497,12 +493,16 @@ class PoseEstimator:
         persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
                                                                     upsample_size=self.resize_out_ratio), w, h)
         # TODO: filter closest
-        roi = self.helper.upper_body_roi(color, persons[0])
         body_roi = RegionOfInterest()
-        body_roi.x_offset = roi[1]
-        body_roi.y_offset = roi[2]
-        body_roi.width = roi[3]
-        body_roi.height = roi[4]
+        try:
+            roi = self.helper.upper_body_roi(color, persons[0])
+            body_roi.x_offset = roi[1]
+            body_roi.y_offset = roi[2]
+            body_roi.width = roi[3]
+            body_roi.height = roi[4]
+        except Exception as e:
+            rospy.logerr('error while getting shirt roi: %s' % e)
+        rospy.loginfo('shirt roi: %r' % body_roi)
         return body_roi
 
     @staticmethod
