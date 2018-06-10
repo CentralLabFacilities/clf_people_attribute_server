@@ -30,8 +30,9 @@ class PeopleAttributeServer:
         self.gender_age = GenderAndAge(self.gender_age_topic)
 
         self.cv_bridge = CvBridge()
+        ts = rospy.Time().now()
         self.estimator = PoseEstimator(cv_bridge=self.cv_bridge, face_id=self.face_id, gender_age=self.gender_age)
-        rospy.loginfo('pose_estimator ready')
+        rospy.loginfo('pose_estimator ready. net load time: %r' % (rospy.Time.now() - ts).to_sec())
 
     def detect_crowd(self, request):
         response = GetCrowdAttributesWithPoseResponse()

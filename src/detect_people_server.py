@@ -192,6 +192,7 @@ class Helper:
         self.cx = msg.K[2]
         self.fy = msg.K[4]
         self.cy = msg.K[5]
+        rospy.loginfo('camera info: %r' % msg)
         self.depth_sub.unregister()
 
     def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh, time_stamp):
@@ -202,6 +203,8 @@ class Helper:
         w = crw * w_factor
         h = crh * h_factor
 
+        # sim: float32
+        # pepper:
         is_in_mm = depth_image.dtype == 'uint16'
         rospy.loginfo('depth_image_type: %r' % depth_image.dtype)
         unit_scaling = 1000.0 if is_in_mm else 1.0
@@ -355,7 +358,7 @@ class Helper:
                         w = h * 0.5
                         x = person['LeftShoulder']['x'] - w
                 else:
-                    rospy.log("No BB possible: RShoulder['confidence'] %f, LShoulder['confidence'] %f,"
+                    rospy.loginfo("No BB possible: RShoulder['confidence'] %f, LShoulder['confidence'] %f,"
                               " RHip['confidence'] %f, LHip['confidence'] %f \n",
                               person['RightShoulder']['confidence'], person['LeftShoulder']['confidence'],
                               person['RightHip']['confidence'],
@@ -427,7 +430,7 @@ class PoseEstimator:
         persons = []
         faces = []
 
-        res_img = TfPoseEstimator.draw_humans(color, result, imgcopy=True)
+        res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img))
 
         for human in humans:
