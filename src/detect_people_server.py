@@ -116,7 +116,13 @@ class GenderAndAge:
     def __init__(self, topic):
         self.topic = topic
         self.sc = rospy.ServiceProxy(self.topic, GenderAndAgeService)
-        self.initialized = True  # todo: wait for service server
+        try:
+            rospy.wait_for_service(self.topic, 3.0)
+            self.initialized = True
+        except rospy.ROSException as e:
+            rospy.loginfo(e)
+            self.initialized = False
+        rospy.loginfo('<<< GenderAndAge: %r' % self.initialized)
 
     def get_genders_and_ages(self, cropped_images):
         req = GenderAndAgeServiceRequest()
@@ -131,7 +137,13 @@ class FaceID:
         self.classify_topic = classify_topic
         self.learn_face_sc = rospy.ServiceProxy(self.learn_topic, LearnPersonImage)
         self.get_face_name_sc = rospy.ServiceProxy(self.classify_topic, DoIKnowThatPersonImage)
-        self.initialized = True  # todo: wait for service server
+        try:
+            rospy.wait_for_service(self.classify_topic, 3.0)
+            self.initialized = True
+        except rospy.ROSException as e:
+            rospy.loginfo(e)
+            self.initialized = False
+        rospy.loginfo('<<< FaceID: %r' % self.initialized)
 
     def get_name(self, cropped_image):
         req = DoIKnowThatPersonImageRequest()
@@ -379,7 +391,7 @@ class PoseEstimator:
 
         self.pose_estimator = TfPoseEstimator(graph_path, target_size=(w, h))
 
-    def get_person_attributes(self, color, depth, do_gender_age=False, do_face_id=False):
+    def get_person_attributes(self, color, depth, do_gender_age=True, do_face_id=True):
 
         w = color.shape[1]
         h = color.shape[0]
@@ -402,7 +414,7 @@ class PoseEstimator:
         persons = []
         faces = []
 
-        res_img = TfPoseEstimator.draw_humans(color, result, imgcopy=False)
+        res_img = TfPoseEstimator.draw_humans(color, result, imgcopy=True)
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img))
 
         for human in humans:
@@ -426,6 +438,7 @@ class PoseEstimator:
                     person.attributes.name = self.face_id.get_name(face)
                     rospy.loginfo('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
             except ValueError as e:
+                rospy.loginfo('no face_roi found. added empty image to faces')
                 faces.append(Image())
             try:
 
