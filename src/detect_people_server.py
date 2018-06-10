@@ -195,7 +195,7 @@ class Helper:
         rospy.loginfo('camera info: %r' % msg)
         self.depth_sub.unregister()
 
-    def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh, time_stamp):
+    def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh, time_stamp, is_in_mm):
         w_factor = (float(depth_image.shape[1]) / float(color_image.shape[1]))
         h_factor = (float(depth_image.shape[0]) / float(color_image.shape[0]))
         x = crx * w_factor
@@ -203,10 +203,7 @@ class Helper:
         w = crw * w_factor
         h = crh * h_factor
 
-        # sim: float32
-        # pepper:
-        is_in_mm = depth_image.dtype == 'uint16'
-        rospy.loginfo('depth_image_type: %r' % depth_image.dtype)
+        rospy.loginfo('is in mm: %r' % is_in_mm)
         unit_scaling = 1000.0 if is_in_mm else 1.0
         constant_x = unit_scaling / self.fx
         constant_y = unit_scaling / self.fy
@@ -407,7 +404,7 @@ class PoseEstimator:
 
         self.pose_estimator = TfPoseEstimator(graph_path, target_size=(w, h))
 
-    def get_person_attributes(self, color, depth, do_gender_age=True, do_face_id=True):
+    def get_person_attributes(self, color, depth, is_in_mm, do_gender_age=True, do_face_id=True):
 
         w = color.shape[1]
         h = color.shape[0]
@@ -445,7 +442,7 @@ class PoseEstimator:
                 f_roi, fx, fy, fw, fh = Helper.head_roi(color, human)
                 rospy.loginfo('timing head_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
-                person.head_pose_stamped = self.helper.depth_lookup(color, depth, fx, fy, fw, fh, time_stamp)
+                person.head_pose_stamped = self.helper.depth_lookup(color, depth, fx, fy, fw, fh, time_stamp, is_in_mm)
                 rospy.loginfo('timing DLU: %r' % (rospy.Time.now() - ts).to_sec())
                 face = self.cv_bridge.cv2_to_imgmsg(f_roi, "bgr8")
                 faces.append(face)
@@ -464,7 +461,7 @@ class PoseEstimator:
                 ts = rospy.Time.now()
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
                 rospy.loginfo('timing shirt_color: %r' % (rospy.Time.now() - ts).to_sec())
-                person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh, ts)
+                person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh, ts, is_in_mm)
             except ValueError as e:
                 pass
 
@@ -486,7 +483,7 @@ class PoseEstimator:
         # TODO
         pass
 
-    def get_closest_person_face(self, color, depth):
+    def get_closest_person_face(self, color, depth, is_in_mm):
         w = color.shape[1]
         h = color.shape[0]
         persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
@@ -494,7 +491,7 @@ class PoseEstimator:
         # TODO: filter closest
         return self.helper.head_roi(color, persons[0])[0]
 
-    def get_closest_person_body_roi(self, color, depth):
+    def get_closest_person_body_roi(self, color, depth, is_in_mm):
         w = color.shape[1]
         h = color.shape[0]
         persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,

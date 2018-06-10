@@ -40,7 +40,7 @@ class PeopleAttributeServer:
         try:
             color = self.cv_bridge.imgmsg_to_cv2(image.color, "bgr8")
             depth = self.cv_bridge.imgmsg_to_cv2(image.depth, "32FC1")
-            persons = self.estimator.get_person_attributes(color, depth)
+            persons = self.estimator.get_person_attributes(color, depth, is_in_mm=image.depth.encoding == '16UC1')
             response.attributes = persons
             return response
         except CvBridgeError as e:
@@ -52,7 +52,8 @@ class PeopleAttributeServer:
         try:
             color = self.cv_bridge.imgmsg_to_cv2(image.color, "bgr8")
             depth = self.cv_bridge.imgmsg_to_cv2(image.depth, "32FC1")
-            face = self.cv_bridge.cv2_to_imgmsg(self.estimator.get_closest_person_face(color, depth))
+            face = self.cv_bridge.cv2_to_imgmsg(
+                self.estimator.get_closest_person_face(color, depth,  is_in_mm=image.depth.encoding == '16UC1'))
             response = self.face_id.learn_face(face, request.name)
             return response
         except CvBridgeError as e:
@@ -65,7 +66,8 @@ class PeopleAttributeServer:
             color = self.cv_bridge.imgmsg_to_cv2(image.color, "bgr8")
             depth = self.cv_bridge.imgmsg_to_cv2(image.depth, "32FC1")
             response = GetFollowRoiResponse()
-            response.roi = self.estimator.get_closest_person_body_roi(color, depth)
+            response.roi = self.estimator.get_closest_person_body_roi(color, depth,
+                                                                      is_in_mm=image.depth.encoding == '16UC1')
             return response
         except CvBridgeError as e:
             rospy.logerr('[tf-pose-estimation] Converting Image Error. ' + str(e))
