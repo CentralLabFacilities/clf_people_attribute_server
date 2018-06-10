@@ -70,6 +70,7 @@ class PeopleAttributeServer:
             rospy.logerr('[tf-pose-estimation] Converting Image Error. ' + str(e))
             return GetFollowRoiResponse()
 
+
 if __name__ == "__main__":
     server = PeopleAttributeServer()
     while not rospy.is_shutdown():

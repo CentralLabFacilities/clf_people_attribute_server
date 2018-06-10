@@ -170,7 +170,7 @@ class Helper:
         self.cy = msg.K[5]
         self.depth_sub.unregister()
 
-    def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh, ts):
+    def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh, time_stamp):
         w_factor = (float(depth_image.shape[1]) / float(color_image.shape[1]))
         h_factor = (float(depth_image.shape[0]) / float(color_image.shape[0]))
         x = crx * w_factor
@@ -204,21 +204,17 @@ class Helper:
         pose.pose.position.y = (float(y) - self.cy) * depth * constant_y
         pose.pose.position.z = depth * unit_scaling
         pose.pose.orientation.w = 1
-        pose.header.stamp = ts
+        pose.header.stamp = time_stamp
         pose.header.frame_id = self.camera_frame
 
-        if not self.tf.frameExists(self.base_frame):
-            rospy.logwarn('%s does not exist!' % self.base_frame)
-        if not self.tf.frameExists(pose.header.frame_id):
-            rospy.logwarn('%s does not exist!' % str(pose.header.frame_id))
-        if self.tf.frameExists(pose.header.frame_id) and self.tf.frameExists(self.base_frame):
-            try:
-                self.tf.waitForTransform(self.base_frame, self.camera_frame, ts,
-                                         rospy.Duration(4.0))
-                transformed_pose = self.tf.transformPose(self.base_frame, pose)
-                return transformed_pose
-            except Exception, e:
-                rospy.logerr("Exception %s" % e)
+        ts = rospy.Time.now()
+        try:
+            self.tf.waitForTransform(self.base_frame, self.camera_frame, time_stamp, rospy.Duration(4.0))
+            transformed_pose = self.tf.transformPose(self.base_frame, pose)
+            rospy.loginfo('timing transform: %r ' % (rospy.Time.now() - ts).to_sec())
+            return transformed_pose
+        except Exception, e:
+            rospy.logerr("Exception %s" % e)
         return None
 
     @staticmethod
@@ -417,8 +413,12 @@ class PoseEstimator:
             person.attributes.gestures = pg['gestures']
 
             try:
+                ts = rospy.Time.now()
                 f_roi, fx, fy, fw, fh = Helper.head_roi(color, human)
+                rospy.loginfo('timing head_roi: %r' % (rospy.Time.now() - ts).to_sec())
+                ts = rospy.Time.now()
                 person.head_pose_stamped = self.helper.depth_lookup(color, depth, fx, fy, fw, fh, time_stamp)
+                rospy.loginfo('timing DLU: %r' % (rospy.Time.now() - ts).to_sec())
                 face = self.cv_bridge.cv2_to_imgmsg(f_roi, "bgr8")
                 faces.append(face)
                 if do_face_id and self.face_id is not None and self.face_id.initialized:
@@ -428,7 +428,10 @@ class PoseEstimator:
             except ValueError as e:
                 faces.append(Image())
             try:
+
+                ts = rospy.Time.now()
                 b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, human)
+                rospy.loginfo('timing body_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
                 rospy.loginfo('timing shirt_color: %r' % (rospy.Time.now() - ts).to_sec())
