@@ -35,6 +35,7 @@ class PeopleAttributeServer:
         rospy.loginfo('pose_estimator ready. net load time: %r' % (rospy.Time.now() - ts).to_sec())
 
     def detect_crowd(self, request):
+        ts = rospy.Time().now()
         response = GetCrowdAttributesWithPoseResponse()
         image = self.image_grabber.call()
         try:
@@ -42,6 +43,7 @@ class PeopleAttributeServer:
             depth = self.cv_bridge.imgmsg_to_cv2(image.depth, "32FC1")
             persons = self.estimator.get_person_attributes(color, depth, is_in_mm=image.depth.encoding == '16UC1')
             response.attributes = persons
+            rospy.loginfo('>> Crowd Attribut call timing: %r' % (rospy.Time.now() - ts).to_sec())
             return response
         except CvBridgeError as e:
             rospy.logerr('[tf-pose-estimation] Converting Image Error. ' + str(e))
