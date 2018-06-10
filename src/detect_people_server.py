@@ -10,7 +10,7 @@ from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonIm
     DoIKnowThatPersonImageRequest, LearnPersonResponse, LearnPersonImageRequest
 from gender_and_age_msgs.srv import GenderAndAgeService, GenderAndAgeServiceRequest
 from openpose_ros_msgs.msg import PersonAttributesWithPose
-from sensor_msgs.msg import CameraInfo, Image
+from sensor_msgs.msg import CameraInfo, Image, RegionOfInterest
 from geometry_msgs.msg import PoseStamped
 
 from tf import TransformListener
@@ -170,7 +170,7 @@ class Helper:
         self.cy = msg.K[5]
         self.depth_sub.unregister()
 
-    def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh):
+    def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh, ts):
         w_factor = (float(depth_image.shape[1]) / float(color_image.shape[1]))
         h_factor = (float(depth_image.shape[0]) / float(color_image.shape[0]))
         x = crx * w_factor
@@ -204,7 +204,7 @@ class Helper:
         pose.pose.position.y = (float(y) - self.cy) * depth * constant_y
         pose.pose.position.z = depth * unit_scaling
         pose.pose.orientation.w = 1
-        pose.header.stamp = rospy.Time.now()
+        pose.header.stamp = ts
         pose.header.frame_id = self.camera_frame
 
         if not self.tf.frameExists(self.base_frame):
@@ -213,7 +213,7 @@ class Helper:
             rospy.logwarn('%s does not exist!' % str(pose.header.frame_id))
         if self.tf.frameExists(pose.header.frame_id) and self.tf.frameExists(self.base_frame):
             try:
-                self.tf.waitForTransform(self.base_frame, self.camera_frame, rospy.Time.now(),
+                self.tf.waitForTransform(self.base_frame, self.camera_frame, ts,
                                          rospy.Duration(4.0))
                 transformed_pose = self.tf.transformPose(self.base_frame, pose)
                 return transformed_pose
@@ -225,6 +225,8 @@ class Helper:
     def head_roi(image, person):
         parts = ['Nose', 'RightEar', 'RightEye', 'LeftEar', 'LeftEye']
         amount = int(sum([np.ceil(person[p]['confidence']) for p in parts]))
+        if amount < 1:
+            raise ValueError('body parts for face not found')
         vf = sum([np.ceil(person[p]['y']) for p in parts])
         v = int(np.floor(vf / amount))
 
@@ -393,11 +395,11 @@ class PoseEstimator:
             return
 
         try:
-            ts = rospy.Time.now()
+            time_stamp = rospy.Time.now()
             result = self.pose_estimator.inference(color, resize_to_default=True,
                                                                        upsample_size=self.resize_out_ratio)
             humans = self.humans_to_dict(result, w, h)
-            rospy.loginfo('timing tf_pose: %r' % (rospy.Time.now() - ts).to_sec())
+            rospy.loginfo('timing tf_pose: %r' % (rospy.Time.now() - time_stamp).to_sec())
         finally:
             self.tf_lock.release()
 
@@ -414,22 +416,25 @@ class PoseEstimator:
             person.attributes.posture = pg['posture']
             person.attributes.gestures = pg['gestures']
 
-            f_roi, fx, fy, fw, fh = Helper.head_roi(color, human)
-            b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, human)
-
-            person.head_pose_stamped = self.helper.depth_lookup(color, depth, fx, fy, fw, fh)
-            person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh)
-
-            face = self.cv_bridge.cv2_to_imgmsg(f_roi, "bgr8")
-            faces.append(face)
-            ts = rospy.Time.now()
-            person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
-            rospy.loginfo('timing shirt_color: %r' % (rospy.Time.now() - ts).to_sec())
-
-            if do_face_id and self.face_id is not None and self.face_id.initialized:
+            try:
+                f_roi, fx, fy, fw, fh = Helper.head_roi(color, human)
+                person.head_pose_stamped = self.helper.depth_lookup(color, depth, fx, fy, fw, fh, time_stamp)
+                face = self.cv_bridge.cv2_to_imgmsg(f_roi, "bgr8")
+                faces.append(face)
+                if do_face_id and self.face_id is not None and self.face_id.initialized:
+                    ts = rospy.Time.now()
+                    person.attributes.name = self.face_id.get_name(face)
+                    rospy.loginfo('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
+            except ValueError as e:
+                faces.append(Image())
+            try:
+                b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, human)
                 ts = rospy.Time.now()
-                person.attributes.name = self.face_id.get_name(face)
-                rospy.loginfo('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
+                person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
+                rospy.loginfo('timing shirt_color: %r' % (rospy.Time.now() - ts).to_sec())
+                person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh, ts)
+            except ValueError as e:
+                pass
 
             persons.append(person)
 
@@ -445,6 +450,10 @@ class PoseEstimator:
         # rospy.loginfo(persons)
         return persons
 
+    def get_closest_person(self, persons, depth):
+        # TODO
+        pass
+
     def get_closest_person_face(self, color, depth):
         w = color.shape[1]
         h = color.shape[0]
@@ -452,6 +461,20 @@ class PoseEstimator:
                                                                     upsample_size=self.resize_out_ratio), w, h)
         # TODO: filter closest
         return Helper.head_roi(color, persons[0])[0]
+
+    def get_closest_person_body_roi(self, color, depth):
+        w = color.shape[1]
+        h = color.shape[0]
+        persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
+                                                                    upsample_size=self.resize_out_ratio), w, h)
+        # TODO: filter closest
+        roi = Helper.body_roi(color, persons[0])
+        body_roi = RegionOfInterest()
+        body_roi.x_offset = roi[1]
+        body_roi.y_offset = roi[2]
+        body_roi.width = roi[3]
+        body_roi.height = roi[4]
+        return body_roi
 
     @staticmethod
     def humans_to_dict(humans, w, h):
