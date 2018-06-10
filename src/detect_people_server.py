@@ -428,7 +428,7 @@ class PoseEstimator:
         faces = []
 
         res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
-        self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img))
+        self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
 
         for human in humans:
             person = PersonAttributesWithPose()
