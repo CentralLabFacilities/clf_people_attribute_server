@@ -222,7 +222,7 @@ class Helper:
         h = crh * h_factor
 
         # rospy.loginfo('is in mm: %r' % is_in_mm)
-        unit_scaling = 1000.0 if is_in_mm else 1.0
+        unit_scaling = 0.001 if is_in_mm else 1.0
         constant_x = unit_scaling / self.fx
         constant_y = unit_scaling / self.fy
 
