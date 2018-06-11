@@ -268,7 +268,7 @@ class Helper:
         v = int(np.floor(vf / amount))
 
         if amount <= 1:
-            x = y = w = h = -1
+            x = y = w = h = 0
             return image[y:y + h, x:x + w]
 
         dist_list_x = []
@@ -305,7 +305,7 @@ class Helper:
         amount = int(sum([np.ceil(person[p]['confidence']) for p in parts]))
 
         if amount <= 1:
-            x = y = w = h = -1
+            x = y = w = h = 0
             return image[y:y + h, x:x + w]
 
         if person['LeftShoulder']['confidence'] > 0 and person['RightShoulder']['confidence'] > 0:
@@ -391,10 +391,10 @@ class Helper:
     @staticmethod
     def get_crotch_roi(person):
         roi = RegionOfInterest()
-        roi.x_offset = -1
-        roi.y_offset = -1
-        roi.width = -1
-        roi.height = -1
+        roi.x_offset = 0
+        roi.y_offset = 0
+        roi.width = 0
+        roi.height = 0
 
         if person['RightShoulder']['confidence'] <= 0 or person['LeftShoulder']['confidence'] <= 0 or person['RightHip']['confidence'] <= 0\
                 or person['LeftHip']['confidence'] <= 0:
@@ -582,15 +582,14 @@ class PoseEstimator:
         # rospy.loginfo(persons)
         return persons
 
-    @staticmethod
-    def get_closest_person(persons, color, depth, is_in_mm):
+    def get_closest_person(self, persons, color, depth, is_in_mm):
         dist = 9999
         closest_person = 0
         for person in persons:
             try:
                 b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, person)
                 ts = rospy.Time.now()
-                pose = Helper.depth_lookup(color, depth, bx, by, bw, bh, ts, is_in_mm)
+                pose = self.helper.depth_lookup(color, depth, bx, by, bw, bh, ts, is_in_mm)
                 if dist > pose.pose.position.x:
                     dist = pose.pose.position.x
                     closest_person = person
