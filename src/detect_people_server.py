@@ -4,6 +4,8 @@ import sys
 import os
 import cv2
 import numpy as np
+
+from enum import Enum
 from threading import Lock, Thread
 
 from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage, \
@@ -37,6 +39,19 @@ body_parts = ['Nose',
               'RightEar',
               'LeftEar']
 
+
+class Gesture(Enum):
+    POINTING_LEFT = 1
+    POINTING_RIGHT = 2
+    RAISING_LEFT_ARM = 3
+    RAISING_RIGHT_ARM = 4
+    WAVING = 5
+    NEUTRAL = 6
+
+class Posture(Enum):
+    SITTING = 1
+    STANDING = 2
+    LYING = 3
 
 class ShirtColor:
     def __init__(self):
@@ -373,9 +388,58 @@ class Helper:
         return image[int(y):int(y + h), int(x):int(x + w)], x, y, w, h
 
     @staticmethod
+    def calcAngle(bodypart_one, bodypart_two):
+        return np.abs(np.arctan2(bodypart_one['y'] - bodypart_two['y'], bodypart_one['x'] - bodypart_two['x']) * 180 / np.pi)
+
+
+    @staticmethod
     def get_posture_and_gestures(person):
-        posture = 2  # 2 = standing
-        gestures = [6]  # 6 = neutral
+        SITTINGPERCENT = 0.4
+
+        gestures = []
+        vertical = 90
+        horizontal = 180
+
+        LShoulderLHipDist = np.sqrt(pow(person['LeftShoulder']['y'] - person['LeftHip']['y'], 2))
+        LShoulderLWristAngle = Helper.calcAngle(person['LeftShoulder'], person['LeftWrist'])
+        LShoulderLHipAngle = Helper.calcAngle(person['LeftShoulder'], person['LeftHip'])
+        LKneeLHipDist = np.sqrt(pow(person['Leftknee']['y'] - person['LeftHip']['y'], 2))
+        LAnkleLHipDist = np.sqrt(pow(person['LeftAnkle']['y'] - person['LeftHip']['y'], 2))
+
+        RShoulderRHipDist = np.sqrt(pow(person['RightShoulder']['y'] - person['RightHip']['y'], 2))
+        RShoulderRWristAngle = Helper.calcAngle(person['RightShoulder'], person['RightWrist'])
+        RShoulderRHipAngle = Helper.calcAngle(person['RightShoulder'], person['RightHip'])
+        RKneeRHipDist = np.sqrt(pow(person['RightKnee']['y'] - person['RightHip']['y'], 2))
+        RAnkleRHipDist = np.sqrt(pow(person['RightAnkle']['y'] - person['RightHip']['y'], 2))
+
+        if (((LKneeLHipDist < (LAnkleLHipDist * SITTINGPERCENT) or RKneeRHipDist < (RAnkleRHipDist * SITTINGPERCENT))
+             and LKneeLHipDist > 0 and RKneeRHipDist > 0 and person['LeftAnkle']['Confidence'] > 0 and person['RightAnkle']['Confidence'] > 0)
+                 or ((LKneeLHipDist < (LShoulderLHipDist * SITTINGPERCENT) or RKneeRHipDist < (RShoulderRHipDist * SITTINGPERCENT))
+                 and person['LeftHip']['Confidence'] > 0 and person['RightHip']['Confidence'] > 0
+                 and person['LeftKnee']['Confidence'] > 0 and person['RightKnee']['Confidence'] > 0
+                 and person['LeftShoulder']['Confidence'] > 0 and person['RightShoulder']['Confidence'] > 0)):
+            posture = Gesture.SITTING
+        elif (np.abs(LShoulderLHipAngle - horizontal) < np.abs(LShoulderLHipAngle - vertical) or
+              np.abs(RShoulderRHipAngle - horizontal) < np.abs(RShoulderRHipAngle - vertical) or
+                LShoulderLHipAngle < 45 or RShoulderRHipAngle < 45):
+            posture = Posture.LYING
+        else:
+            posture = Posture.STANDING
+        
+        if ((0 <= RShoulderRWristAngle and RShoulderRWristAngle <= 15) or (165 <= RShoulderRWristAngle and RShoulderRWristAngle <= 180)):
+            gestures.append(Gesture.POINTING_RIGHT)
+        elif ( ( 0 <= LShoulderLWristAngle and LShoulderLWristAngle <= 15 ) or ( 165 <= LShoulderLWristAngle and LShoulderLWristAngle <= 180 ) ):
+            gestures.append(Gesture.POINTING_LEFT)
+        elif (person['LeftElbow']['y'] < person['LeftShoulder']['y'] and person['LeftElbow']['y'] > 0 and person['LeftShoulder']['y'] > 0):
+            gestures.append(Gesture.RAISING_LEFT_ARM)
+        elif (person['RightElbow']['y'] < person['RightShoulder']['y'] and person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0):
+            gestures.append(Gesture.RAISING_RIGHT_ARM)
+        elif ((person['LeftWrist']['y'] < person['LeftEar']['y'] and person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
+                (person['RightWrist']['y'] < person['RightEar']['y'] and person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0)):
+            gestures.push_back(Gesture.WAVING)
+        else: 
+            gestures.append(Gesture.NEUTRAL)
+        
         return {'posture': posture, 'gestures': gestures}
 
 
