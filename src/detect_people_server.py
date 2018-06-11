@@ -389,7 +389,7 @@ class Helper:
         return image[int(y):int(y + h), int(x):int(x + w)], x, y, w, h
 
     @staticmethod
-    def get_crotch_roi(image, person):
+    def get_crotch_roi(person):
         roi = RegionOfInterest()
         if person['RightShoulder']['confidence'] <= 0 or person['LeftShoulder']['confidence'] <= 0 or person['RightHip']['confidence'] <= 0\
                 or person['LeftHip']['confidence'] <= 0:
@@ -397,17 +397,17 @@ class Helper:
             return roi
 
         roi.x_offset = person['RightShoulder']['x']
-        roi.y_offset = person['RightShoulder']['y'] + np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) / 2
+        roi.y_offset = person['RightShoulder']['y'] + np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) * 0.6
         roi.width = np.abs(person['RightShoulder']['x'] - person['LeftShoulder']['x'])
-        roi.heigth = person['RightHip']['y'] + np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) / 2
+        roi.height = np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) * 0.9
 
         # roi.x_offset =
         # roi.y_offset =
         # roi.width =
         # roi.height =
-        cv2.imshow("CROTCH ROI", image[roi])
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # cv2.imshow("CROTCH ROI", image[int(roi.y_offset):int(roi.y_offset + roi.height), int(roi.x_offset):int(roi.x_offset + roi.width)])
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
         return roi
 
     @staticmethod
@@ -600,14 +600,11 @@ class PoseEstimator:
         person = self.get_closest_person(persons, color, depth, is_in_mm)
         body_roi = RegionOfInterest()
         try:
-            roi = self.helper.upper_body_roi(color, persons[0])
-            body_roi.x_offset = roi[1]
-            body_roi.y_offset = roi[2]
-            body_roi.width = roi[3]
-            body_roi.height = roi[4]
+            body_roi = self.helper.get_crotch_roi(person)
+
         except Exception as e:
-            rospy.logerr('error while getting shirt roi: %s' % e)
-        rospy.loginfo('shirt roi: %r' % body_roi)
+            rospy.logerr('error while getting crotch roi: %s' % e)
+        rospy.loginfo('crotch roi: %r' % body_roi)
         return body_roi
 
     @staticmethod
