@@ -389,18 +389,25 @@ class Helper:
         return image[int(y):int(y + h), int(x):int(x + w)], x, y, w, h
 
     @staticmethod
-    def get_crotch_roi(person):
+    def get_crotch_roi(image, person):
         roi = RegionOfInterest()
         if person['RightShoulder']['confidence'] <= 0 or person['LeftShoulder']['confidence'] <= 0 or person['RightHip']['confidence'] <= 0\
                 or person['LeftHip']['confidence'] <= 0:
             rospy.loginfo("Cant create crotch bounding box!")
             return roi
 
+        roi.x_offset = person['RightShoulder']['x']
+        roi.y_offset = person['RightShoulder']['y'] + np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) / 2
+        roi.width = np.abs(person['RightShoulder']['x'] - person['LeftShoulder']['x'])
+        roi.heigth = person['RightHip']['y'] + np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) / 2
 
         # roi.x_offset =
         # roi.y_offset =
         # roi.width =
         # roi.height =
+        cv2.imshow("CROTCH ROI", image[roi])
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
         return roi
 
     @staticmethod
