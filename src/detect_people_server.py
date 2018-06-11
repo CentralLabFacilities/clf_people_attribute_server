@@ -608,8 +608,8 @@ class PoseEstimator:
                     dist = pose.pose.position.x
                     closest_person = person
                     print(pose.pose)
-            except ValueError as e:
-                rospy.loginfo('Error in get_closest_person:', e)
+            except Exception as e:
+                rospy.loginfo('Error in get_closest_person: %r' % e)
         return closest_person
 
     def get_closest_person_face(self, color, depth, is_in_mm):
