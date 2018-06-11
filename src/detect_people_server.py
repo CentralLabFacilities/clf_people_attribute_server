@@ -219,7 +219,7 @@ class Helper:
         w = crw * w_factor
         h = crh * h_factor
 
-        rospy.loginfo('is in mm: %r' % is_in_mm)
+        # rospy.loginfo('is in mm: %r' % is_in_mm)
         unit_scaling = 1000.0 if is_in_mm else 1.0
         constant_x = unit_scaling / self.fx
         constant_y = unit_scaling / self.fy
@@ -507,6 +507,7 @@ class PoseEstimator:
 
     def get_person_attributes(self, color, depth, is_in_mm, do_gender_age=True, do_face_id=True):
 
+        rospy.loginfo('----------------------------------------')
         w = color.shape[1]
         h = color.shape[0]
         acquired = self.tf_lock.acquire(False)
@@ -517,8 +518,9 @@ class PoseEstimator:
             time_stamp = rospy.Time.now()
             result = self.pose_estimator.inference(color, resize_to_default=True,
                                                    upsample_size=self.resize_out_ratio)
+            rospy.loginfo('>> timing tf_pose: %r (found %r people)' % ((rospy.Time.now() - time_stamp).to_sec(),
+                                                                       len(result)))
             humans = self.humans_to_dict(result, w, h)
-            rospy.loginfo('timing tf_pose: %r' % (rospy.Time.now() - time_stamp).to_sec())
         finally:
             self.tf_lock.release()
 
@@ -549,7 +551,8 @@ class PoseEstimator:
                 if do_face_id and self.face_id is not None and self.face_id.initialized:
                     ts = rospy.Time.now()
                     person.attributes.name = self.face_id.get_name(face)
-                    rospy.loginfo('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
+                    rospy.loginfo('timing face_id: %r (name: %r)' % ((rospy.Time.now() - ts).to_sec(),
+                                                                     person.attributes.name))
             except Exception as e:
                 rospy.loginfo('no face_roi found')
             try:
@@ -559,7 +562,8 @@ class PoseEstimator:
                 rospy.loginfo('timing body_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
-                rospy.loginfo('timing shirt_color: %r' % (rospy.Time.now() - ts).to_sec())
+                rospy.loginfo('timing shirt_color: %r (color: %r)' % ((rospy.Time.now() - ts).to_sec(),
+                                                                      person.attributes.shirtcolor))
                 person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh, time_stamp, is_in_mm)
             except ValueError as e:
                 pass
@@ -571,7 +575,6 @@ class PoseEstimator:
             ts = rospy.Time.now()
             g_a = self.gender_age.get_genders_and_ages(faces)
             rospy.loginfo('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
-
             for i in range(0, len(faces)):
                 persons[face_idxs[i]].attributes.gender_hyp = g_a[face_idxs[i]].gender_probability
                 persons[face_idxs[i]].attributes.age_hyp = g_a[face_idxs[i]].age_probability
