@@ -388,6 +388,21 @@ class Helper:
         return image[int(y):int(y + h), int(x):int(x + w)], x, y, w, h
 
     @staticmethod
+    def get_crotch_roi(person):
+        roi = RegionOfInterest()
+        if person['RightShoulder']['confidence'] <= 0 or person['LeftShoulder']['confidence'] <= 0 or person['RightHip']['confidence'] <= 0\
+                or person['LeftHip']['confidence'] <= 0:
+            rospy.loginfo("Cant create crotch bounding box!")
+            return roi
+
+
+        # roi.x_offset =
+        # roi.y_offset =
+        # roi.width =
+        # roi.height =
+        return roi
+
+    @staticmethod
     def calcAngle(bodypart_one, bodypart_two):
         return np.abs(np.arctan2(bodypart_one['y'] - bodypart_two['y'], bodypart_one['x'] - bodypart_two['x']) * 180 / np.pi)
 
@@ -403,7 +418,7 @@ class Helper:
         LShoulderLHipDist = np.sqrt(pow(person['LeftShoulder']['y'] - person['LeftHip']['y'], 2))
         LShoulderLWristAngle = Helper.calcAngle(person['LeftShoulder'], person['LeftWrist'])
         LShoulderLHipAngle = Helper.calcAngle(person['LeftShoulder'], person['LeftHip'])
-        LKneeLHipDist = np.sqrt(pow(person['Leftknee']['y'] - person['LeftHip']['y'], 2))
+        LKneeLHipDist = np.sqrt(pow(person['LeftKnee']['y'] - person['LeftHip']['y'], 2))
         LAnkleLHipDist = np.sqrt(pow(person['LeftAnkle']['y'] - person['LeftHip']['y'], 2))
 
         RShoulderRHipDist = np.sqrt(pow(person['RightShoulder']['y'] - person['RightHip']['y'], 2))
@@ -425,7 +440,7 @@ class Helper:
             posture = Posture.LYING
         else:
             posture = Posture.STANDING
-        
+
         if ((0 <= RShoulderRWristAngle and RShoulderRWristAngle <= 15) or (165 <= RShoulderRWristAngle and RShoulderRWristAngle <= 180)):
             gestures.append(Gesture.POINTING_RIGHT)
         elif ( ( 0 <= LShoulderLWristAngle and LShoulderLWristAngle <= 15 ) or ( 165 <= LShoulderLWristAngle and LShoulderLWristAngle <= 180 ) ):
@@ -539,17 +554,29 @@ class PoseEstimator:
         # rospy.loginfo(persons)
         return persons
 
-    def get_closest_person(self, persons, depth):
-        # TODO
-        pass
+    @staticmethod
+    def get_closest_person(persons, color, depth, is_in_mm):
+        dist = 9999
+        closest_person = 0
+        for person in persons:
+            try:
+                b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, person)
+                ts = rospy.Time.now()
+                pose = Helper.depth_lookup(color, depth, bx, by, bw, bh, ts, is_in_mm)
+                if dist > pose.pose.position.x:
+                    dist = pose.pose.position.x
+                    closest_person = person
+            except ValueError as e:
+                rospy.loginfo('Error in get_closest_person:', e)
+        return closest_person
 
     def get_closest_person_face(self, color, depth, is_in_mm):
         w = color.shape[1]
         h = color.shape[0]
         persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
                                                                     upsample_size=self.resize_out_ratio), w, h)
-        # TODO: filter closest
-        return self.helper.head_roi(color, persons[0])[0]
+        person = self.get_closest_person(persons, color, depth, is_in_mm)
+        return self.helper.head_roi(color, person)[0]
 
     def get_closest_person_body_roi(self, color, depth, is_in_mm):
         w = color.shape[1]
@@ -557,6 +584,7 @@ class PoseEstimator:
         persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
                                                                     upsample_size=self.resize_out_ratio), w, h)
         # TODO: filter closest
+        person = self.get_closest_person(persons, color, depth, is_in_mm)
         body_roi = RegionOfInterest()
         try:
             roi = self.helper.upper_body_roi(color, persons[0])
