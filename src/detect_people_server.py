@@ -48,10 +48,12 @@ class Gesture(Enum):
     WAVING = 5
     NEUTRAL = 6
 
+
 class Posture(Enum):
     SITTING = 1
     STANDING = 2
     LYING = 3
+
 
 class ShirtColor:
     def __init__(self):
@@ -396,20 +398,22 @@ class Helper:
         roi.width = 0
         roi.height = 0
 
-        if person['RightShoulder']['confidence'] <= 0 or person['LeftShoulder']['confidence'] <= 0 or person['RightHip']['confidence'] <= 0\
+        if person['RightShoulder']['confidence'] <= 0 or person['LeftShoulder']['confidence'] <= 0 or \
+                        person['RightHip']['confidence'] <= 0 \
                 or person['LeftHip']['confidence'] <= 0:
             rospy.loginfo("Cant create crotch bounding box!")
             return roi
 
-
         if person['RightShoulder']['x'] < person['LeftShoulder']['x']:
             roi.x_offset = person['RightShoulder']['x']
-            roi.y_offset = person['RightShoulder']['y'] + np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) * 0.6
+            roi.y_offset = person['RightShoulder']['y'] + np.abs(
+                person['RightHip']['y'] - person['RightShoulder']['y']) * 0.6
             roi.width = np.abs(person['RightShoulder']['x'] - person['LeftShoulder']['x'])
             roi.height = np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) * 0.9
         else:
             roi.x_offset = person['LeftShoulder']['x']
-            roi.y_offset = person['LeftShoulder']['y'] + np.abs(person['LeftHip']['y'] - person['LeftShoulder']['y']) * 0.6
+            roi.y_offset = person['LeftShoulder']['y'] + np.abs(
+                person['LeftHip']['y'] - person['LeftShoulder']['y']) * 0.6
             roi.width = np.abs(person['LeftShoulder']['x'] - person['RightShoulder']['x'])
             roi.height = np.abs(person['LeftHip']['y'] - person['LeftShoulder']['y']) * 0.9
 
@@ -424,8 +428,8 @@ class Helper:
 
     @staticmethod
     def calcAngle(bodypart_one, bodypart_two):
-        return np.abs(np.arctan2(bodypart_one['y'] - bodypart_two['y'], bodypart_one['x'] - bodypart_two['x']) * 180 / np.pi)
-
+        return np.abs(
+            np.arctan2(bodypart_one['y'] - bodypart_two['y'], bodypart_one['x'] - bodypart_two['x']) * 180 / np.pi)
 
     @staticmethod
     def get_posture_and_gestures(person):
@@ -450,15 +454,15 @@ class Helper:
         if (((LKneeLHipDist < (LAnkleLHipDist * SITTINGPERCENT) or RKneeRHipDist < (RAnkleRHipDist * SITTINGPERCENT))
              and LKneeLHipDist > 0 and RKneeRHipDist > 0 and person['LeftAnkle']['confidence'] > 0
              and person['RightAnkle']['confidence'] > 0)
-                 or ((LKneeLHipDist < (LShoulderLHipDist * SITTINGPERCENT)
-                      or RKneeRHipDist < (RShoulderRHipDist * SITTINGPERCENT))
-                 and person['LeftHip']['confidence'] > 0 and person['RightHip']['confidence'] > 0
-                 and person['LeftKnee']['confidence'] > 0 and person['RightKnee']['confidence'] > 0
-                 and person['LeftShoulder']['confidence'] > 0 and person['RightShoulder']['confidence'] > 0)):
+            or ((LKneeLHipDist < (LShoulderLHipDist * SITTINGPERCENT)
+                 or RKneeRHipDist < (RShoulderRHipDist * SITTINGPERCENT))
+                and person['LeftHip']['confidence'] > 0 and person['RightHip']['confidence'] > 0
+                and person['LeftKnee']['confidence'] > 0 and person['RightKnee']['confidence'] > 0
+                and person['LeftShoulder']['confidence'] > 0 and person['RightShoulder']['confidence'] > 0)):
             posture = Posture.SITTING.value
         elif (np.abs(LShoulderLHipAngle - horizontal) < np.abs(LShoulderLHipAngle - vertical) or
-              np.abs(RShoulderRHipAngle - horizontal) < np.abs(RShoulderRHipAngle - vertical) or
-                LShoulderLHipAngle < 45 or RShoulderRHipAngle < 45):
+                      np.abs(RShoulderRHipAngle - horizontal) < np.abs(RShoulderRHipAngle - vertical) or
+                      LShoulderLHipAngle < 45 or RShoulderRHipAngle < 45):
             posture = Posture.LYING.value
         else:
             posture = Posture.STANDING.value
@@ -471,9 +475,9 @@ class Helper:
         elif person['RightShoulder']['y'] > person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0:
             gestures.append(Gesture.RAISING_RIGHT_ARM.value)
         elif ((person['LeftEar']['y'] > person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
-                (person['RightEar']['y'] > person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0)):
+                  (person['RightEar']['y'] > person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0)):
             gestures.append(Gesture.WAVING.value)
-        else: 
+        else:
             gestures.append(Gesture.NEUTRAL.value)
 
         post_gest = {'posture': posture, 'gestures': gestures}
@@ -584,7 +588,7 @@ class PoseEstimator:
 
     def get_closest_person(self, persons, color, depth, is_in_mm):
         dist = 9999
-        closest_person = 0
+        closest_person = persons[0]
         for person in persons:
             try:
                 b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, person)
@@ -593,6 +597,7 @@ class PoseEstimator:
                 if dist > pose.pose.position.x:
                     dist = pose.pose.position.x
                     closest_person = person
+                    print(pose.pose)
             except ValueError as e:
                 rospy.loginfo('Error in get_closest_person:', e)
         return closest_person
