@@ -391,15 +391,27 @@ class Helper:
     @staticmethod
     def get_crotch_roi(person):
         roi = RegionOfInterest()
+        roi.x_offset = -1
+        roi.y_offset = -1
+        roi.width = -1
+        roi.height = -1
+
         if person['RightShoulder']['confidence'] <= 0 or person['LeftShoulder']['confidence'] <= 0 or person['RightHip']['confidence'] <= 0\
                 or person['LeftHip']['confidence'] <= 0:
             rospy.loginfo("Cant create crotch bounding box!")
             return roi
 
-        roi.x_offset = person['RightShoulder']['x']
-        roi.y_offset = person['RightShoulder']['y'] + np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) * 0.6
-        roi.width = np.abs(person['RightShoulder']['x'] - person['LeftShoulder']['x'])
-        roi.height = np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) * 0.9
+
+        if person['RightShoulder']['x'] < person['LeftShoulder']['x']:
+            roi.x_offset = person['RightShoulder']['x']
+            roi.y_offset = person['RightShoulder']['y'] + np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) * 0.6
+            roi.width = np.abs(person['RightShoulder']['x'] - person['LeftShoulder']['x'])
+            roi.height = np.abs(person['RightHip']['y'] - person['RightShoulder']['y']) * 0.9
+        else:
+            roi.x_offset = person['LeftShoulder']['x']
+            roi.y_offset = person['LeftShoulder']['y'] + np.abs(person['LeftHip']['y'] - person['LeftShoulder']['y']) * 0.6
+            roi.width = np.abs(person['LeftShoulder']['x'] - person['RightShoulder']['x'])
+            roi.height = np.abs(person['LeftHip']['y'] - person['LeftShoulder']['y']) * 0.9
 
         # roi.x_offset =
         # roi.y_offset =
