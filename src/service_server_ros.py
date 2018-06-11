@@ -45,17 +45,20 @@ class PeopleAttributeServer:
 
     def detect_crowd_action(self, goal):
         result = GetCrowdAttributesWithPoseResult()
-        result.attributes = self.detect_crowd(do_face_id=goal.face_id, do_gender_age=goal.gender_and_age)
+        resize_ratio = None if goal.resize_out_ratio == 0.0 else goal.resize_out_ratio
+        result.attributes = self.detect_crowd(do_face_id=goal.face_id, do_gender_age=goal.gender_and_age,
+                                              resize_out_ratio=resize_ratio)
         self.crowd_action_server.set_succeeded(result)
 
-    def detect_crowd(self, do_face_id=True, do_gender_age=True):
+    def detect_crowd(self, do_face_id=True, do_gender_age=True, resize_out_ratio=None):
         ts = rospy.Time().now()
         image = self.image_grabber.call()
         try:
             color = self.cv_bridge.imgmsg_to_cv2(image.color, "bgr8")
             depth = self.cv_bridge.imgmsg_to_cv2(image.depth, "32FC1")
             persons = self.estimator.get_person_attributes(color, depth, is_in_mm=image.depth.encoding == '16UC1',
-                                                           do_gender_age=do_gender_age, do_face_id=do_face_id)
+                                                           do_gender_age=do_gender_age, do_face_id=do_face_id,
+                                                           resize_out_ratio=resize_out_ratio)
             rospy.loginfo('>> Crowd Attribute call timing: %r' % (rospy.Time.now() - ts).to_sec())
             return persons
         except CvBridgeError as e:

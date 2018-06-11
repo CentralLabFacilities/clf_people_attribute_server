@@ -421,7 +421,8 @@ class Helper:
         # roi.y_offset =
         # roi.width =
         # roi.height =
-        # cv2.imshow("CROTCH ROI", image[int(roi.y_offset):int(roi.y_offset + roi.height), int(roi.x_offset):int(roi.x_offset + roi.width)])
+        # cv2.imshow("CROTCH ROI", image[int(roi.y_offset):int(roi.y_offset + roi.height),
+        # int(roi.x_offset):int(roi.x_offset + roi.width)])
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
         return roi
@@ -509,7 +510,7 @@ class PoseEstimator:
 
         self.pose_estimator = TfPoseEstimator(graph_path, target_size=(w, h))
 
-    def get_person_attributes(self, color, depth, is_in_mm, do_gender_age=True, do_face_id=True):
+    def get_person_attributes(self, color, depth, is_in_mm, do_gender_age=True, do_face_id=True, resize_out_ratio=None):
 
         rospy.loginfo('----------------------------------------')
         w = color.shape[1]
@@ -518,10 +519,13 @@ class PoseEstimator:
         if not acquired:
             return
 
+        if resize_out_ratio is None:
+            resize_out_ratio = self.resize_out_ratio
+
         try:
             time_stamp = rospy.Time.now()
             result = self.pose_estimator.inference(color, resize_to_default=True,
-                                                   upsample_size=self.resize_out_ratio)
+                                                   upsample_size=resize_out_ratio)
             rospy.loginfo('>> timing tf_pose: %r (found %r people)' % ((rospy.Time.now() - time_stamp).to_sec(),
                                                                        len(result)))
             humans = self.humans_to_dict(result, w, h)
