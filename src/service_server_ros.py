@@ -48,7 +48,7 @@ class PeopleAttributeServer:
         result.attributes = self.detect_crowd(do_face_id=goal.face_id, do_gender_age=goal.gender_and_age)
         self.crowd_action_server.set_succeeded(result)
 
-    def detect_crowd(self, do_face_id=False, do_gender_age=False):
+    def detect_crowd(self, do_face_id=True, do_gender_age=True):
         ts = rospy.Time().now()
         image = self.image_grabber.call()
         try:

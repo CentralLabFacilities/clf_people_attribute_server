@@ -207,6 +207,7 @@ class Helper:
         self.cx = msg.K[2]
         self.fy = msg.K[4]
         self.cy = msg.K[5]
+        self.camera_frame = msg.header.frame_id
         rospy.loginfo('camera info: %r' % msg)
         self.depth_sub.unregister()
 
@@ -501,10 +502,11 @@ class PoseEstimator:
 
         persons = []
         faces = []
-
+        face_idxs = []
         res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
 
+        idx = 0
         for human in humans:
             person = PersonAttributesWithPose()
 
@@ -521,13 +523,13 @@ class PoseEstimator:
                 rospy.loginfo('timing DLU: %r' % (rospy.Time.now() - ts).to_sec())
                 face = self.cv_bridge.cv2_to_imgmsg(f_roi, "bgr8")
                 faces.append(face)
+                face_idxs.append(idx)
                 if do_face_id and self.face_id is not None and self.face_id.initialized:
                     ts = rospy.Time.now()
                     person.attributes.name = self.face_id.get_name(face)
                     rospy.loginfo('timing face_id: %r' % (rospy.Time.now() - ts).to_sec())
-            except ValueError as e:
-                rospy.loginfo('no face_roi found. added empty image to faces')
-                faces.append(Image())
+            except Exception as e:
+                rospy.loginfo('no face_roi found')
             try:
 
                 ts = rospy.Time.now()
@@ -536,20 +538,21 @@ class PoseEstimator:
                 ts = rospy.Time.now()
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
                 rospy.loginfo('timing shirt_color: %r' % (rospy.Time.now() - ts).to_sec())
-                person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh, ts, is_in_mm)
+                person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh, time_stamp, is_in_mm)
             except ValueError as e:
                 pass
 
             persons.append(person)
+            idx += 1
 
-        if do_gender_age and self.gender_age is not None and self.gender_age.initialized:
+        if do_gender_age and self.gender_age is not None and self.gender_age.initialized and len(faces) > 0:
             ts = rospy.Time.now()
             g_a = self.gender_age.get_genders_and_ages(faces)
             rospy.loginfo('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
 
-            for i in range(0, len(persons)):
-                persons[i].attributes.gender_hyp = g_a[i].gender_probability
-                persons[i].attributes.age_hyp = g_a[i].age_probability
+            for i in range(0, len(faces)):
+                persons[face_idxs[i]].attributes.gender_hyp = g_a[face_idxs[i]].gender_probability
+                persons[face_idxs[i]].attributes.age_hyp = g_a[face_idxs[i]].age_probability
 
         # rospy.loginfo(persons)
         return persons
