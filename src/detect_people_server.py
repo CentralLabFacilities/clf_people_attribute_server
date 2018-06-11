@@ -429,34 +429,37 @@ class Helper:
         RAnkleRHipDist = np.sqrt(pow(person['RightAnkle']['y'] - person['RightHip']['y'], 2))
 
         if (((LKneeLHipDist < (LAnkleLHipDist * SITTINGPERCENT) or RKneeRHipDist < (RAnkleRHipDist * SITTINGPERCENT))
-             and LKneeLHipDist > 0 and RKneeRHipDist > 0 and person['LeftAnkle']['Confidence'] > 0 and person['RightAnkle']['Confidence'] > 0)
-                 or ((LKneeLHipDist < (LShoulderLHipDist * SITTINGPERCENT) or RKneeRHipDist < (RShoulderRHipDist * SITTINGPERCENT))
-                 and person['LeftHip']['Confidence'] > 0 and person['RightHip']['Confidence'] > 0
-                 and person['LeftKnee']['Confidence'] > 0 and person['RightKnee']['Confidence'] > 0
-                 and person['LeftShoulder']['Confidence'] > 0 and person['RightShoulder']['Confidence'] > 0)):
-            posture = Gesture.SITTING
+             and LKneeLHipDist > 0 and RKneeRHipDist > 0 and person['LeftAnkle']['confidence'] > 0
+             and person['RightAnkle']['confidence'] > 0)
+                 or ((LKneeLHipDist < (LShoulderLHipDist * SITTINGPERCENT)
+                      or RKneeRHipDist < (RShoulderRHipDist * SITTINGPERCENT))
+                 and person['LeftHip']['confidence'] > 0 and person['RightHip']['confidence'] > 0
+                 and person['LeftKnee']['confidence'] > 0 and person['RightKnee']['confidence'] > 0
+                 and person['LeftShoulder']['confidence'] > 0 and person['RightShoulder']['confidence'] > 0)):
+            posture = Posture.SITTING.value
         elif (np.abs(LShoulderLHipAngle - horizontal) < np.abs(LShoulderLHipAngle - vertical) or
               np.abs(RShoulderRHipAngle - horizontal) < np.abs(RShoulderRHipAngle - vertical) or
                 LShoulderLHipAngle < 45 or RShoulderRHipAngle < 45):
-            posture = Posture.LYING
+            posture = Posture.LYING.value
         else:
-            posture = Posture.STANDING
-
-        if ((0 <= RShoulderRWristAngle and RShoulderRWristAngle <= 15) or (165 <= RShoulderRWristAngle and RShoulderRWristAngle <= 180)):
-            gestures.append(Gesture.POINTING_RIGHT)
-        elif ( ( 0 <= LShoulderLWristAngle and LShoulderLWristAngle <= 15 ) or ( 165 <= LShoulderLWristAngle and LShoulderLWristAngle <= 180 ) ):
-            gestures.append(Gesture.POINTING_LEFT)
-        elif (person['LeftElbow']['y'] < person['LeftShoulder']['y'] and person['LeftElbow']['y'] > 0 and person['LeftShoulder']['y'] > 0):
-            gestures.append(Gesture.RAISING_LEFT_ARM)
-        elif (person['RightElbow']['y'] < person['RightShoulder']['y'] and person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0):
-            gestures.append(Gesture.RAISING_RIGHT_ARM)
-        elif ((person['LeftWrist']['y'] < person['LeftEar']['y'] and person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
-                (person['RightWrist']['y'] < person['RightEar']['y'] and person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0)):
-            gestures.push_back(Gesture.WAVING)
+            posture = Posture.STANDING.value
+        if (0 <= RShoulderRWristAngle <= 15) or (165 <= RShoulderRWristAngle <= 180):
+            gestures.append(Gesture.POINTING_RIGHT.value)
+        elif (0 <= LShoulderLWristAngle <= 15) or (165 <= LShoulderLWristAngle <= 180):
+            gestures.append(Gesture.POINTING_LEFT.value)
+        elif person['LeftShoulder']['y'] > person['LeftElbow']['y'] > 0 and person['LeftShoulder']['y'] > 0:
+            gestures.append(Gesture.RAISING_LEFT_ARM.value)
+        elif person['RightShoulder']['y'] > person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0:
+            gestures.append(Gesture.RAISING_RIGHT_ARM.value)
+        elif ((person['LeftEar']['y'] > person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
+                (person['RightEar']['y'] > person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0)):
+            gestures.append(Gesture.WAVING.value)
         else: 
-            gestures.append(Gesture.NEUTRAL)
-        
-        return {'posture': posture, 'gestures': gestures}
+            gestures.append(Gesture.NEUTRAL.value)
+
+        post_gest = {'posture': posture, 'gestures': gestures}
+        rospy.loginfo(post_gest)
+        return post_gest
 
 
 class PoseEstimator:
