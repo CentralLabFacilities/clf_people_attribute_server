@@ -475,13 +475,13 @@ class Helper:
             posture = Posture.STANDING.value
         if (0 <= RShoulderRWristAngle <= 15) or (165 <= RShoulderRWristAngle <= 180):
             gestures.append(Gesture.POINTING_RIGHT.value)
-        elif (0 <= LShoulderLWristAngle <= 15) or (165 <= LShoulderLWristAngle <= 180):
+        if (0 <= LShoulderLWristAngle <= 15) or (165 <= LShoulderLWristAngle <= 180):
             gestures.append(Gesture.POINTING_LEFT.value)
-        elif person['LeftShoulder']['y'] > person['LeftElbow']['y'] > 0 and person['LeftShoulder']['y'] > 0:
+        if person['LeftShoulder']['y'] > person['LeftElbow']['y'] > 0 and person['LeftShoulder']['y'] > 0:
             gestures.append(Gesture.RAISING_LEFT_ARM.value)
-        elif person['RightShoulder']['y'] > person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0:
+        if person['RightShoulder']['y'] > person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0:
             gestures.append(Gesture.RAISING_RIGHT_ARM.value)
-        elif ((person['LeftEar']['y'] > person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
+        if ((person['LeftEar']['y'] > person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
                   (person['RightEar']['y'] > person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0)):
             gestures.append(Gesture.WAVING.value)
         else:
