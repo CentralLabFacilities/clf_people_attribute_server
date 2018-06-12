@@ -27,7 +27,6 @@ class PeopleAttributeServer:
         self.crowd_service = rospy.Service(self.crowd_topic, GetCrowdAttributesWithPose, self.detect_crowd_service)
         self.crowd_action_server = actionlib.SimpleActionServer(self.crowd_topic, GetCrowdAttributesWithPoseAction,
                                                                 self.detect_crowd_action, auto_start=False)
-        self.crowd_action_server.start()
         self.learn_service = rospy.Service(self.learn_topic, LearnPerson, self.learn_face)
         self.follow_roi_service = rospy.Service(self.follow_topic, GetFollowRoi, self.get_follow_roi)
 
@@ -37,6 +36,7 @@ class PeopleAttributeServer:
         ts = rospy.Time().now()
         self.estimator = PoseEstimator(cv_bridge=self.cv_bridge, face_id=self.face_id, gender_age=self.gender_age)
         rospy.loginfo('pose_estimator ready. net load time: %r' % (rospy.Time.now() - ts).to_sec())
+        self.crowd_action_server.start()
 
     def detect_crowd_service(self, request):
         response = GetCrowdAttributesWithPoseResponse()

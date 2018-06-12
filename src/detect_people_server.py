@@ -503,7 +503,6 @@ class PoseEstimator:
         self.cv_bridge = cv_bridge
         self.tf_lock = Lock()
         self.helper = Helper()
-        self.result_pub = rospy.Publisher('/tf_pose/result', Image, queue_size=1)
 
         try:
             w, h = model_wh(resolution)
@@ -515,6 +514,7 @@ class PoseEstimator:
             sys.exit(-1)
 
         self.pose_estimator = TfPoseEstimator(graph_path, target_size=(w, h))
+        self.result_pub = rospy.Publisher('/tf_pose/result', Image, queue_size=1)
 
     def get_person_attributes(self, color, depth, is_in_mm, do_gender_age=True, do_face_id=True, resize_out_ratio=None):
 
