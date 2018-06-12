@@ -623,8 +623,11 @@ class PoseEstimator:
     def get_closest_person_body_roi(self, color, depth, is_in_mm):
         w = color.shape[1]
         h = color.shape[0]
-        persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
-                                                                    upsample_size=self.resize_out_ratio), w, h)
+        result = self.pose_estimator.inference(color, resize_to_default=True,
+                                                      upsample_size=self.resize_out_ratio)
+        persons = self.humans_to_dict(result, w, h)
+        res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
+        self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
         # TODO: filter closest
         person = self.get_closest_person(persons, color, depth, is_in_mm)
         body_roi = RegionOfInterest()
