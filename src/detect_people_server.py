@@ -467,24 +467,32 @@ class Helper:
                 and person['LeftKnee']['confidence'] > 0 and person['RightKnee']['confidence'] > 0
                 and person['LeftShoulder']['confidence'] > 0 and person['RightShoulder']['confidence'] > 0)):
             posture = Posture.SITTING.value
-        elif (np.abs(LShoulderLHipAngle - horizontal) < np.abs(LShoulderLHipAngle - vertical) or
-                      np.abs(RShoulderRHipAngle - horizontal) < np.abs(RShoulderRHipAngle - vertical) or
-                      LShoulderLHipAngle < 45 or RShoulderRHipAngle < 45):
+        elif ((np.abs(LShoulderLHipAngle - horizontal) < np.abs(LShoulderLHipAngle - vertical) or
+                np.abs(RShoulderRHipAngle - horizontal) < np.abs(RShoulderRHipAngle - vertical) or
+                LShoulderLHipAngle < 45 or RShoulderRHipAngle < 45)
+                and person['RightShoulder']['confidence'] > 0 and person['RightHip']['confidence'] > 0
+                and person['LeftShoulder']['confidence'] > 0 and person['LeftHip']['confidence'] > 0):
             posture = Posture.LYING.value
         else:
             posture = Posture.STANDING.value
-        if (0 <= RShoulderRWristAngle <= 15) or (165 <= RShoulderRWristAngle <= 180):
+        if ((0 <= RShoulderRWristAngle <= 15) or (165 <= RShoulderRWristAngle <= 180)
+                and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
             gestures.append(Gesture.POINTING_RIGHT.value)
-        if (0 <= LShoulderLWristAngle <= 15) or (165 <= LShoulderLWristAngle <= 180):
+        if ((0 <= LShoulderLWristAngle <= 15) or (165 <= LShoulderLWristAngle <= 180)
+                and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
             gestures.append(Gesture.POINTING_LEFT.value)
-        if person['LeftShoulder']['y'] > person['LeftElbow']['y'] > 0 and person['LeftShoulder']['y'] > 0:
+        if ((person['LeftShoulder']['y'] > person['LeftElbow']['y'] > 0 and person['LeftShoulder']['y'] > 0)
+                and person['LeftShoulder']['confidence'] > 0 and person['LeftElbow']['confidence'] > 0):
             gestures.append(Gesture.RAISING_LEFT_ARM.value)
-        if person['RightShoulder']['y'] > person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0:
+        if ((person['RightShoulder']['y'] > person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0)
+                and person['RightShoulder']['confidence'] > 0 and person['RightElbow']['confidence'] > 0):
             gestures.append(Gesture.RAISING_RIGHT_ARM.value)
-        if ((person['LeftEar']['y'] > person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
-                  (person['RightEar']['y'] > person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0)):
+        if (((person['LeftEar']['y'] > person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
+                (person['RightEar']['y'] > person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0))
+                and person['LeftEar']['confidence'] > 0 and person['LeftWrist']['confidence'] > 0
+                and person['RightEar']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
             gestures.append(Gesture.WAVING.value)
-        else:
+        if len(gestures) == 0:
             gestures.append(Gesture.NEUTRAL.value)
 
         post_gest = {'posture': posture, 'gestures': gestures}
