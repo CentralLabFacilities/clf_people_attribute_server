@@ -523,7 +523,7 @@ class PoseEstimator:
         h = color.shape[0]
         acquired = self.tf_lock.acquire(False)
         if not acquired:
-            return
+            return []
 
         if resize_out_ratio is None:
             resize_out_ratio = self.resize_out_ratio
