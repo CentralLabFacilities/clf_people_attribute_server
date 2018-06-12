@@ -612,9 +612,12 @@ class PoseEstimator:
                 b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, person)
                 ts = rospy.Time.now()
                 pose = self.helper.depth_lookup(color, depth, bx, by, bw, bh, ts, is_in_mm)
+                print("PERSON POSE ")
+                print(pose)
                 if dist > pose.pose.position.x:
                     dist = pose.pose.position.x
                     closest_person = person
+                    print("closest pose: ")
                     print(pose.pose)
             except Exception as e:
                 rospy.loginfo('Error in get_closest_person: %r' % e)
