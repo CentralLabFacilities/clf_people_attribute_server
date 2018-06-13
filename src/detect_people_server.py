@@ -634,7 +634,6 @@ class PoseEstimator:
                 ts = rospy.Time.now()
                 b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, human)
 
-                cv2.rectangle(res_img, (bx, by), (bx + bw, by +bh), (0, 0, 255))
                 rospy.loginfo('timing body_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
@@ -706,17 +705,6 @@ class PoseEstimator:
         except Exception as e:
             rospy.logerr('error while getting crotch roi: %s' % e)
         rospy.loginfo('crotch roi: %r' % body_roi)
-
-
-        # roi.x_offset = 0
-        # roi.y_offset = 0
-        # roi.width = 0
-        # roi.height = 0
-
-        res_img = color
-        cv2.rectangle(res_img, (body_roi.x_offset, body_roi.y_offset),
-                      (body_roi.x_offset + body_roi.width, body_roi.y_offset + body_roi.height), (255,255,255))
-        self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
 
         return body_roi
 
