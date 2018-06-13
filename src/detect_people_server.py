@@ -4,14 +4,17 @@ import sys
 import os
 import cv2
 import numpy as np
+import time
 
 from enum import Enum
 from threading import Lock, Thread
 
 from clf_perception_vision_msgs.srv import LearnPersonImage, DoIKnowThatPersonImage, \
     DoIKnowThatPersonImageRequest, LearnPersonResponse, LearnPersonImageRequest
+from gender_and_age_msgs.msg import GenderAndAgeList
 from gender_and_age_msgs.srv import GenderAndAgeService, GenderAndAgeServiceRequest
 from openpose_ros_msgs.msg import PersonAttributesWithPose
+from rospy import ServiceException
 from sensor_msgs.msg import CameraInfo, Image, RegionOfInterest
 from geometry_msgs.msg import PoseStamped
 
@@ -133,6 +136,7 @@ class GenderAndAge:
     def __init__(self, topic):
         self.topic = topic
         self.sc = rospy.ServiceProxy(self.topic, GenderAndAgeService)
+        self.response = GenderAndAgeList()
 
         def init_service():
             try:
@@ -147,11 +151,37 @@ class GenderAndAge:
         t = Thread(target=init_service())
         t.start()
 
+    @staticmethod
+    def short_repr(gender_and_age_list):
+        return ['%s, %s' % (g.gender_probability.gender, g.age_probability.age) for g in gender_and_age_list]
+
     def get_genders_and_ages(self, cropped_images):
+        self.response = GenderAndAgeList()
         req = GenderAndAgeServiceRequest()
-        req.objects = cropped_images
-        resp = self.sc.call(req)
-        return resp.gender_and_age_response.gender_and_age_list
+
+        def do_service_call(_cropped_images):
+            req.objects = _cropped_images
+            try:
+                resp = self.sc.call(req)
+                self.response = resp.gender_and_age_response.gender_and_age_list
+                rospy.loginfo('gender_and_age thread returned: %r ' % self.short_repr(self.response))
+            except ServiceException as e:
+                rospy.logerr(e)
+                self.response = None
+
+        service_thread = Thread(target=do_service_call, args=[cropped_images])
+        service_thread.start()
+        time.sleep(0.02)
+        ts = rospy.Time.now() + rospy.Duration(secs=10)
+        while service_thread.isAlive() and ts > rospy.Time.now():
+            rospy.Rate(10.0).sleep()
+        if not service_thread.isAlive():
+            service_thread.join()
+            rospy.loginfo('gender_and_age thread joined. %r' % self.short_repr(self.response))
+            return self.response
+        else:
+            rospy.loginfo('gender_and_age thread detached [!] %r' % self.short_repr(self.response))
+            return None
 
 
 class FaceID:
@@ -160,6 +190,8 @@ class FaceID:
         self.classify_topic = classify_topic
         self.learn_face_sc = rospy.ServiceProxy(self.learn_topic, LearnPersonImage)
         self.get_face_name_sc = rospy.ServiceProxy(self.classify_topic, DoIKnowThatPersonImage)
+
+        self.response = ''
 
         def init_service():
             try:
@@ -176,9 +208,30 @@ class FaceID:
 
     def get_name(self, cropped_image):
         req = DoIKnowThatPersonImageRequest()
-        req.roi = cropped_image
-        r = self.get_face_name_sc.call(req)
-        return r.name
+
+        def do_service_call(_cropped_image):
+            req.roi = _cropped_image
+            try:
+                resp = self.get_face_name_sc.call(req)
+                self.response = resp.name
+                rospy.loginfo('face_id thread returned: %r ' % self.response)
+            except ServiceException as e:
+                rospy.logerr(e)
+                self.response = None
+
+        service_thread = Thread(target=do_service_call, args=[cropped_image])
+        service_thread.start()
+        time.sleep(0.02)
+        ts = rospy.Time.now() + rospy.Duration(secs=10)
+        while service_thread.isAlive() and ts > rospy.Time.now():
+            rospy.Rate(10.0).sleep()
+        if not service_thread.isAlive():
+            service_thread.join()
+            rospy.loginfo('face_id thread joined. %r' % self.response)
+            return self.response
+        else:
+            rospy.loginfo('face_id thread detached [!] %r' % self.response)
+            return None
 
     def learn_face(self, cropped_image, name):
         response = LearnPersonResponse()
@@ -210,7 +263,7 @@ class Helper:
         self.fy = msg.K[4]
         self.cy = msg.K[5]
         self.camera_frame = msg.header.frame_id
-        rospy.loginfo('camera info: %r' % msg)
+        # rospy.loginfo('camera info: %r' % msg)
         self.depth_sub.unregister()
 
     def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh, time_stamp, is_in_mm):
@@ -599,13 +652,14 @@ class PoseEstimator:
         if do_gender_age and self.gender_age is not None and self.gender_age.initialized and len(faces) > 0:
             ts = rospy.Time.now()
             g_a = self.gender_age.get_genders_and_ages(faces)
-            rospy.loginfo('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
-            rospy.loginfo('gender & ages: %r' % g_a)
-            for i in range(0, len(faces)):
-                persons[face_idxs[i]].attributes.gender_hyp = g_a[face_idxs[i]].gender_probability
-                persons[face_idxs[i]].attributes.age_hyp = g_a[face_idxs[i]].age_probability
-
-        # rospy.loginfo(persons)
+            if g_a is not None:
+                rospy.loginfo('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
+                rospy.loginfo('gender & ages: %r' % self.gender_age.short_repr(g_a))
+                for i in range(0, len(faces)):
+                    persons[face_idxs[i]].attributes.gender_hyp = g_a[face_idxs[i]].gender_probability
+                    persons[face_idxs[i]].attributes.age_hyp = g_a[face_idxs[i]].age_probability
+            else:
+                rospy.loginfo('gender_and_age timed out: %r ' % (rospy.Time.now() - ts).to_sec())
         return persons
 
     def get_closest_person(self, persons, color, depth, is_in_mm):
