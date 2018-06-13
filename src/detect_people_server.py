@@ -387,7 +387,10 @@ class Helper:
         if (w <= 0) or (h <= 0) or (x <= 0) or (y <= 0):
             rospy.loginfo("w or h <= 0")
             x = y = w = h = 0
-
+        cv2.imshow("UPPER BODY ROI", image[int(roi.y_offset):int(roi.y_offset + roi.height),
+        int(roi.x_offset):int(roi.x_offset + roi.width)])
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
         return image[int(y):int(y + h), int(x):int(x + w)], x, y, w, h
 
     @staticmethod
