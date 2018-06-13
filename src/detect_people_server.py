@@ -603,7 +603,6 @@ class PoseEstimator:
         faces = []
         face_idxs = []
         res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
-        self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
 
         idx = 0
         for human in humans:
@@ -634,6 +633,8 @@ class PoseEstimator:
 
                 ts = rospy.Time.now()
                 b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, human)
+
+                cv2.rectangle(res_img, (bx, by), (bx + bw, by +bh), (0, 0, 255))
                 rospy.loginfo('timing body_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
@@ -657,6 +658,8 @@ class PoseEstimator:
                     persons[face_idxs[i]].attributes.age_hyp = g_a[face_idxs[i]].age_probability
             else:
                 rospy.loginfo('gender_and_age timed out: %r ' % (rospy.Time.now() - ts).to_sec())
+
+        self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
         return persons
 
     def get_closest_person(self, persons, color, depth, is_in_mm):
@@ -694,7 +697,7 @@ class PoseEstimator:
         persons = self.humans_to_dict(result, w, h)
         res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
-        # TODO: filter closest
+
         person = self.get_closest_person(persons, color, depth, is_in_mm)
         body_roi = RegionOfInterest()
         try:
@@ -703,6 +706,18 @@ class PoseEstimator:
         except Exception as e:
             rospy.logerr('error while getting crotch roi: %s' % e)
         rospy.loginfo('crotch roi: %r' % body_roi)
+
+
+        # roi.x_offset = 0
+        # roi.y_offset = 0
+        # roi.width = 0
+        # roi.height = 0
+
+        res_img = color
+        cv2.rectangle(res_img, (body_roi.x_offset, body_roi.y_offset),
+                      (body_roi.x_offset + body_roi.width, body_roi.y_offset + body_roi.height), (255,255,255))
+        self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
+
         return body_roi
 
     @staticmethod
