@@ -597,6 +597,7 @@ class PoseEstimator:
             ts = rospy.Time.now()
             g_a = self.gender_age.get_genders_and_ages(faces)
             rospy.loginfo('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
+            rospy.loginfo('gender & ages: %r' % g_a)
             for i in range(0, len(faces)):
                 persons[face_idxs[i]].attributes.gender_hyp = g_a[face_idxs[i]].gender_probability
                 persons[face_idxs[i]].attributes.age_hyp = g_a[face_idxs[i]].age_probability
