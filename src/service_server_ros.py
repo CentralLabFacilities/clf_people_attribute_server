@@ -1,5 +1,5 @@
 #!/usr/bin/env python 
-import rospy
+import rospy 
 import actionlib
 from detect_people_server import FaceID, GenderAndAge, PoseEstimator
 from pepper_clf_msgs.srv import DepthAndColorImage
