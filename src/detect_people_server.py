@@ -642,8 +642,12 @@ class PoseEstimator:
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
                 try:
                     w, h = self.drawTextWithBG(res_img, person.attributes.shirtcolor, (int(bx), int(by)))
-                    self.drawTextWithBG(res_img, str(person.attributes.posture), (int(bx), int(by+h+10)))
-                    self.drawTextWithBG(res_img, str(person.attributes.gestures), (int(bx), int(by+h+10+h+10)))
+                    self.drawTextWithBG(res_img, Posture(person.attributes.posture).name, (int(bx), int(by+h+10)))
+                    gst = ''
+                    for gs in person.attributes.gestures:
+                        gst += Gesture(gs).name + ', '
+
+                    self.drawTextWithBG(res_img, gst, (int(bx), int(by+h+10+h+10)))
                 except Exception as e:
                     rospy.loginfo(e)
                 rospy.loginfo('timing shirt_color: %r (color: %r)' % ((rospy.Time.now() - ts).to_sec(),
