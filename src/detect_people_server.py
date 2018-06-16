@@ -136,7 +136,8 @@ class GenderAndAge:
     def __init__(self, topic):
         self.topic = topic
         self.sc = rospy.ServiceProxy(self.topic, GenderAndAgeService)
-        self.response = GenderAndAgeList()
+        list = GenderAndAgeList()
+        self.response = list.gender_and_age_list
 
         def init_service():
             try:
@@ -156,7 +157,8 @@ class GenderAndAge:
         return ['%s, %s' % (g.gender_probability.gender, g.age_probability.age) for g in gender_and_age_list]
 
     def get_genders_and_ages(self, cropped_images):
-        self.response = GenderAndAgeList()
+        list = GenderAndAgeList()
+        self.response = list.gender_and_age_list
         req = GenderAndAgeServiceRequest()
 
         def do_service_call(_cropped_images):
