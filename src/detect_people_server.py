@@ -109,9 +109,9 @@ class ShirtColor:
 
         if V < 75:
             color = "black"
-        elif V > 190 and S < 27:
+        elif V >= 190 and S < 27:
             color = "white"
-        elif S < 53 and V < 185:
+        elif S < 50 and V < 190:
             color = "grey"
         elif H < 14:
             color = "red"
@@ -530,11 +530,11 @@ class Helper:
             posture = Posture.LYING.value
         else:
             posture = Posture.STANDING.value
-        if ((0 <= RShoulderRWristAngle <= 15) or (165 <= RShoulderRWristAngle <= 180)
-        and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
+        if ((0 <= RShoulderRWristAngle <= 25) or (155 <= RShoulderRWristAngle <= 180)
+                and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
             gestures.append(Gesture.POINTING_RIGHT.value)
-        if ((0 <= LShoulderLWristAngle <= 15) or (165 <= LShoulderLWristAngle <= 180)
-        and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
+        if ((0 <= LShoulderLWristAngle <= 25) or (155 <= LShoulderLWristAngle <= 180)
+                and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
             gestures.append(Gesture.POINTING_LEFT.value)
         if ((person['LeftShoulder']['y'] > person['LeftElbow']['y'] > 0 and person['LeftShoulder']['y'] > 0)
             and person['LeftShoulder']['confidence'] > 0 and person['LeftElbow']['confidence'] > 0):
@@ -542,10 +542,10 @@ class Helper:
         if ((person['RightShoulder']['y'] > person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0)
             and person['RightShoulder']['confidence'] > 0 and person['RightElbow']['confidence'] > 0):
             gestures.append(Gesture.RAISING_RIGHT_ARM.value)
-        if (((person['LeftEar']['y'] > person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
-                 (person['RightEar']['y'] > person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0))
-            and person['LeftEar']['confidence'] > 0 and person['LeftWrist']['confidence'] > 0
-            and person['RightEar']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
+        if (((person['LeftShoulder']['y'] > person['LeftWrist']['y'] > 0 and person['LeftShoulder']['y'] > 0) or
+                (person['RightShoulder']['y'] > person['RightWrist']['y'] > 0 and person['RightShoulder']['y'] > 0))
+                and person['LeftShoulder']['confidence'] > 0 and person['LeftWrist']['confidence'] > 0
+                and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
             gestures.append(Gesture.WAVING.value)
         if len(gestures) == 0:
             gestures.append(Gesture.NEUTRAL.value)
