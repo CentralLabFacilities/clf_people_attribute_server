@@ -586,6 +586,7 @@ class PoseEstimator:
         h = color.shape[0]
         acquired = self.tf_lock.acquire(False)
         if not acquired:
+            rospy.loginfo('tf-lock still acquired... returning')
             return []
 
         if resize_out_ratio is None:
