@@ -639,7 +639,12 @@ class PoseEstimator:
                 rospy.loginfo('timing body_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
-                self.drawTextWithBG(res_img, person.attributes.shirtcolor, (int(bx), int(by)))
+                try:
+                    w, h = self.drawTextWithBG(res_img, person.attributes.shirtcolor, (int(bx), int(by)))
+                    self.drawTextWithBG(res_img, str(person.attributes.posture), (int(bx), int(by+h+10)))
+                    self.drawTextWithBG(res_img, str(person.attributes.gestures), (int(bx), int(by+h+10+h+10)))
+                except Exception as e:
+                    rospy.loginfo(e)
                 rospy.loginfo('timing shirt_color: %r (color: %r)' % ((rospy.Time.now() - ts).to_sec(),
                                                                       person.attributes.shirtcolor))
                 person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh, time_stamp, is_in_mm)
@@ -677,6 +682,7 @@ class PoseEstimator:
                     fontScale,
                     fontColor,
                     lineType)
+        return int(size[0][0]), int(size[0][1])
 
     def get_closest_person(self, persons, color, depth, is_in_mm):
         dist = 9999
