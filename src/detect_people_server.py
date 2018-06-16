@@ -523,29 +523,29 @@ class Helper:
                 and person['LeftShoulder']['confidence'] > 0 and person['RightShoulder']['confidence'] > 0)):
             posture = Posture.SITTING.value
         elif ((np.abs(LShoulderLHipAngle - horizontal) < np.abs(LShoulderLHipAngle - vertical) or
-                np.abs(RShoulderRHipAngle - horizontal) < np.abs(RShoulderRHipAngle - vertical) or
-                LShoulderLHipAngle < 45 or RShoulderRHipAngle < 45)
-                and person['RightShoulder']['confidence'] > 0 and person['RightHip']['confidence'] > 0
-                and person['LeftShoulder']['confidence'] > 0 and person['LeftHip']['confidence'] > 0):
+                       np.abs(RShoulderRHipAngle - horizontal) < np.abs(RShoulderRHipAngle - vertical) or
+                       LShoulderLHipAngle < 45 or RShoulderRHipAngle < 45)
+              and person['RightShoulder']['confidence'] > 0 and person['RightHip']['confidence'] > 0
+              and person['LeftShoulder']['confidence'] > 0 and person['LeftHip']['confidence'] > 0):
             posture = Posture.LYING.value
         else:
             posture = Posture.STANDING.value
         if ((0 <= RShoulderRWristAngle <= 15) or (165 <= RShoulderRWristAngle <= 180)
-                and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
+        and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
             gestures.append(Gesture.POINTING_RIGHT.value)
         if ((0 <= LShoulderLWristAngle <= 15) or (165 <= LShoulderLWristAngle <= 180)
-                and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
+        and person['RightShoulder']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
             gestures.append(Gesture.POINTING_LEFT.value)
         if ((person['LeftShoulder']['y'] > person['LeftElbow']['y'] > 0 and person['LeftShoulder']['y'] > 0)
-                and person['LeftShoulder']['confidence'] > 0 and person['LeftElbow']['confidence'] > 0):
+            and person['LeftShoulder']['confidence'] > 0 and person['LeftElbow']['confidence'] > 0):
             gestures.append(Gesture.RAISING_LEFT_ARM.value)
         if ((person['RightShoulder']['y'] > person['RightElbow']['y'] > 0 and person['RightShoulder']['y'] > 0)
-                and person['RightShoulder']['confidence'] > 0 and person['RightElbow']['confidence'] > 0):
+            and person['RightShoulder']['confidence'] > 0 and person['RightElbow']['confidence'] > 0):
             gestures.append(Gesture.RAISING_RIGHT_ARM.value)
         if (((person['LeftEar']['y'] > person['LeftWrist']['y'] > 0 and person['LeftEar']['y'] > 0) or
-                (person['RightEar']['y'] > person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0))
-                and person['LeftEar']['confidence'] > 0 and person['LeftWrist']['confidence'] > 0
-                and person['RightEar']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
+                 (person['RightEar']['y'] > person['RightWrist']['y'] > 0 and person['RightEar']['y'] > 0))
+            and person['LeftEar']['confidence'] > 0 and person['LeftWrist']['confidence'] > 0
+            and person['RightEar']['confidence'] > 0 and person['RightWrist']['confidence'] > 0):
             gestures.append(Gesture.WAVING.value)
         if len(gestures) == 0:
             gestures.append(Gesture.NEUTRAL.value)
@@ -639,6 +639,7 @@ class PoseEstimator:
                 rospy.loginfo('timing body_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
+                self.drawTextWithBG(res_img, person.attributes.shirtcolor, (int(bx), int(by)))
                 rospy.loginfo('timing shirt_color: %r (color: %r)' % ((rospy.Time.now() - ts).to_sec(),
                                                                       person.attributes.shirtcolor))
                 person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh, time_stamp, is_in_mm)
@@ -662,6 +663,20 @@ class PoseEstimator:
 
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
         return persons
+
+    def drawTextWithBG(self, image, text, point):
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        fontScale = 1
+        fontColor = (255, 255, 255)
+        lineType = 2
+        size = cv2.getTextSize(text, font, fontScale, lineType)
+        cv2.rectangle(image, point, (point[0] + int(size[0][0]), int(point[1] + size[0][1])), (0, 0, 0), -1)
+        cv2.putText(image, text,
+                    (point[0], int(point[1] + size[0][1])),
+                    font,
+                    fontScale,
+                    fontColor,
+                    lineType)
 
     def get_closest_person(self, persons, color, depth, is_in_mm):
         dist = 9999
@@ -694,7 +709,7 @@ class PoseEstimator:
         w = color.shape[1]
         h = color.shape[0]
         result = self.pose_estimator.inference(color, resize_to_default=True,
-                                                      upsample_size=self.resize_out_ratio)
+                                               upsample_size=self.resize_out_ratio)
         persons = self.humans_to_dict(result, w, h)
         res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
