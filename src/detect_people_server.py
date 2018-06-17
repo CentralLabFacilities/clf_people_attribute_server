@@ -344,10 +344,27 @@ class Helper:
 
         min_dist_u = np.amin(dist_list_x)
 
+        dist_list_y = []
+        if person['Nose']['y'] != 0:
+            dist_list_y.append(np.abs(person['Nose']['y']))
+        if person['RightEar']['y'] != 0:
+            dist_list_y.append(np.abs(person['RightEar']['y']))
+        if person['RightEye']['y'] != 0:
+            dist_list_y.append(np.abs(person['RightEye']['y']))
+        if person['LeftEar']['y'] != 0:
+            dist_list_y.append(np.abs(person['LeftEar']['y']))
+        if person['LeftEye']['y'] != 0:
+            dist_list_y.append(np.abs(person['LeftEye']['y']))
+
+        min_dist_v = np.amin(dist_list_y)
+
         x = min_dist_u
         w = max_dist_u - min_dist_u
         h = w * 1.5
-        y = v - h / 2
+        if v - h / 2 > 0:
+            y = v - h / 2
+        else:
+            y = min_dist_v
 
         if x + w >= image.shape[1]:
             w = w - np.abs((x + w) - image.shape[1])
@@ -618,6 +635,7 @@ class PoseEstimator:
             try:
                 ts = rospy.Time.now()
                 f_roi, fx, fy, fw, fh = Helper.head_roi(color, human)
+
                 rospy.loginfo('timing head_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
                 person.head_pose_stamped = self.helper.depth_lookup(color, depth, fx, fy, fw, fh, time_stamp, is_in_mm)
@@ -693,7 +711,9 @@ class PoseEstimator:
 
     def get_closest_person(self, persons, color, depth, is_in_mm):
         dist = 9999
-        closest_person = persons[0]
+        closest_pose = None
+        closest_person = None
+
         for person in persons:
             try:
                 b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, person)
@@ -701,13 +721,16 @@ class PoseEstimator:
                 pose = self.helper.depth_lookup(color, depth, bx, by, bw, bh, ts, is_in_mm)
                 print("PERSON POSE ")
                 print(pose)
-                if dist > pose.pose.position.x:
-                    dist = pose.pose.position.x
-                    closest_person = person
-                    print("closest pose: ")
-                    print(pose.pose)
+                if pose is not None:
+                    if dist > pose.pose.position.x > 0:
+                        dist = pose.pose.position.x
+                        closest_person = person
+                        closest_pose = pose
             except Exception as e:
                 rospy.loginfo('Error in get_closest_person: %r' % e)
+
+        print("Closest person pose:")
+        print(closest_pose)
         return closest_person
 
     def get_closest_person_face(self, color, depth, is_in_mm):
@@ -716,6 +739,7 @@ class PoseEstimator:
         persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
                                                                     upsample_size=self.resize_out_ratio), w, h)
         person = self.get_closest_person(persons, color, depth, is_in_mm)
+
         return self.helper.head_roi(color, person)[0]
 
     def get_closest_person_body_roi(self, color, depth, is_in_mm):
@@ -730,7 +754,8 @@ class PoseEstimator:
         person = self.get_closest_person(persons, color, depth, is_in_mm)
         body_roi = RegionOfInterest()
         try:
-            body_roi = self.helper.get_crotch_roi(person)
+            if person is not None:
+                body_roi = self.helper.get_crotch_roi(person)
 
         except Exception as e:
             rospy.logerr('error while getting crotch roi: %s' % e)
