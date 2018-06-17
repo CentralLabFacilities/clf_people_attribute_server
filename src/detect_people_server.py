@@ -154,7 +154,9 @@ class GenderAndAge:
 
     @staticmethod
     def short_repr(gender_and_age_list):
-        return ['%s, %s' % (g.gender_probability.gender, g.age_probability.age) for g in gender_and_age_list]
+        if gender_and_age_list is not None:
+            return ['%s, %s' % (g.gender_probability.gender, g.age_probability.age) for g in gender_and_age_list]
+        return 'none'
 
     def get_genders_and_ages(self, cropped_images):
         list = GenderAndAgeList()
