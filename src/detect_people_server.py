@@ -354,7 +354,7 @@ class Helper:
         if y + h >= image.shape[0]:
             h = h - np.abs((y + h) - image.shape[0])
 
-        return image[int(y):int(y + h), int(x):int(x + w)], x, y, w, h
+        return image[int(y):int(y + h), int(x):int(x + w)], int(x), int(y), int(w), int(h)
 
     @staticmethod
     def upper_body_roi(image, person):
@@ -443,7 +443,7 @@ class Helper:
             rospy.loginfo("w or h <= 0")
             x = y = w = h = 0
 
-        return image[int(y):int(y + h), int(x):int(x + w)], x, y, w, h
+        return image[int(y):int(y + h), int(x):int(x + w)], int(x), int(y), int(w), int(h)
 
     @staticmethod
     def get_crotch_roi(person):
@@ -625,13 +625,15 @@ class PoseEstimator:
                 face = self.cv_bridge.cv2_to_imgmsg(f_roi, "bgr8")
                 faces.append(face)
                 face_idxs.append(idx)
+
+                cv2.rectangle(res_img, (fx, fy), (fx+fw, fy+fh), (255, 0, 0), 1)
                 if do_face_id and self.face_id is not None and self.face_id.initialized:
                     ts = rospy.Time.now()
                     person.attributes.name = self.face_id.get_name(face)
                     rospy.loginfo('timing face_id: %r (name: %r)' % ((rospy.Time.now() - ts).to_sec(),
                                                                      person.attributes.name))
             except Exception as e:
-                rospy.loginfo('no face_roi found')
+                rospy.loginfo('no face_roi found: %s' % e)
             try:
 
                 ts = rospy.Time.now()
@@ -676,7 +678,7 @@ class PoseEstimator:
 
     def drawTextWithBG(self, image, text, point):
         font = cv2.FONT_HERSHEY_SIMPLEX
-        fontScale = 1
+        fontScale = 0.5
         fontColor = (255, 255, 255)
         lineType = 2
         size = cv2.getTextSize(text, font, fontScale, lineType)
