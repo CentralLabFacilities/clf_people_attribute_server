@@ -318,7 +318,11 @@ class Helper:
         for sample in samples:
             try:
                 value = depth_image[int(sample[1]), int(sample[0])]
+                if value == 0 or value is None:
+                    rospy.logerr('INVALID VALUE!!: %r ' % value)
+                    continue
                 values.append(value)
+
             except Exception as e:
                 rospy.logerr("Exception %s" % e)
 
