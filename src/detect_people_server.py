@@ -111,7 +111,7 @@ class ShirtColor:
             color = "black"
         elif V >= 190 and S < 27:
             color = "white"
-        elif S < 50 and V < 190:
+        elif S < 60 and V < 190:
             color = "grey"
         elif H < 14:
             color = "red"
