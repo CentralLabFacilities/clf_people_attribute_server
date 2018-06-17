@@ -284,19 +284,43 @@ class Helper:
         constant_y = unit_scaling / self.fy
 
         # TODO: better sampling
+
         samples = \
             [
-                (x + (w * 0.50), y + (h * 0.25)),  # top
-                (x + (w * 0.25), y + (h * 0.50)),  # left
+                (x + (w * 0.50), y + (h * 0.12)),  # top1
+                (x + (w * 0.50), y + (h * 0.25)),  # top2
+                (x + (w * 0.50), y + (h * 0.37)),  # top3
+
+                (x + (w * 0.25), y + (h * 0.25)),  # topl
+
+                (x + (w * 0.75), y + (h * 0.25)),  # topr
+
+                (x + (w * 0.12), y + (h * 0.50)),  # left1
+                (x + (w * 0.25), y + (h * 0.50)),  # left2
+                (x + (w * 0.37), y + (h * 0.50)),  # left3
+
                 (x + (w * 0.50), y + (h * 0.50)),  # center
-                (x + (w * 0.75), y + (h * 0.50)),  # right
-                (x + (w * 0.50), y + (h * 0.75)),  # bottom
+
+                (x + (w * 0.62), y + (h * 0.50)),  # right1
+                (x + (w * 0.75), y + (h * 0.50)),  # right2
+                (x + (w * 0.87), y + (h * 0.50)),  # right3
+
+                (x + (w * 0.25), y + (h * 0.75)),  # bottoml
+
+                (x + (w * 0.75), y + (h * 0.75)),  # bottomr
+
+                (x + (w * 0.50), y + (h * 0.62)),  # bottom1
+                (x + (w * 0.50), y + (h * 0.75)),  # bottom2
+                (x + (w * 0.50), y + (h * 0.87)),  # bottom3
             ]
 
         values = []
         for sample in samples:
-            value = depth_image[int(sample[1]), int(sample[0])]
-            values.append(value)
+            try:
+                value = depth_image[int(sample[1]), int(sample[0])]
+                values.append(value)
+            except Exception as e:
+                rospy.logerr("Exception %s" % e)
 
         depth = np.median(values)
         pose = PoseStamped()
@@ -315,7 +339,7 @@ class Helper:
             return transformed_pose
         except Exception, e:
             rospy.logerr("Exception %s" % e)
-        return None
+        return PoseStamped()
 
     @staticmethod
     def head_roi(image, person):
