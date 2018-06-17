@@ -344,27 +344,13 @@ class Helper:
 
         min_dist_u = np.amin(dist_list_x)
 
-        dist_list_y = []
-        if person['Nose']['y'] != 0:
-            dist_list_y.append(np.abs(person['Nose']['y']))
-        if person['RightEar']['y'] != 0:
-            dist_list_y.append(np.abs(person['RightEar']['y']))
-        if person['RightEye']['y'] != 0:
-            dist_list_y.append(np.abs(person['RightEye']['y']))
-        if person['LeftEar']['y'] != 0:
-            dist_list_y.append(np.abs(person['LeftEar']['y']))
-        if person['LeftEye']['y'] != 0:
-            dist_list_y.append(np.abs(person['LeftEye']['y']))
-
-        min_dist_v = np.amin(dist_list_y)
-
         x = min_dist_u
         w = max_dist_u - min_dist_u
         h = w * 1.5
-        if v - h / 2 > 0:
-            y = v - h / 2
-        else:
-            y = min_dist_v
+        y = v - h / 2
+        if y < 0:
+            h += y
+            y = 0
 
         if x + w >= image.shape[1]:
             w = w - np.abs((x + w) - image.shape[1])
