@@ -495,13 +495,13 @@ class Helper:
         if person['RightShoulder']['x'] < person['LeftShoulder']['x']:
             roi.x_offset = person['RightShoulder']['x']
             roi.y_offset = int(person['RightShoulder']['y'] + np.abs(
-                person['RightHip']['y'] - person['RightShoulder']['y']) * 0.864)
+                person['RightHip']['y'] - person['RightShoulder']['y']) * 0.45)
             roi.width = np.abs(person['RightShoulder']['x'] - person['LeftShoulder']['x'])
             roi.height = np.abs(person['RightHip']['y'] - roi.y_offset) * 2
         else:
             roi.x_offset = person['LeftShoulder']['x']
             roi.y_offset = int(person['LeftShoulder']['y'] + np.abs(
-                person['LeftHip']['y'] - person['LeftShoulder']['y']) * 0.864)
+                person['LeftHip']['y'] - person['LeftShoulder']['y']) * 0.45)
             roi.width = np.abs(person['LeftShoulder']['x'] - person['RightShoulder']['x'])
             roi.height = np.abs(person['LeftHip']['y'] - roi.y_offset) * 2
 
