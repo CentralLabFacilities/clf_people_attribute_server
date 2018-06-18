@@ -669,7 +669,9 @@ class PoseEstimator:
                 cv2.rectangle(res_img, (fx, fy), (fx+fw, fy+fh), (255, 0, 0), 1)
                 if do_face_id and self.face_id is not None and self.face_id.initialized:
                     ts = rospy.Time.now()
-                    person.attributes.name = self.face_id.get_name(face)
+                    name = self.face_id.get_name(face)
+                    if name is not None:
+                        person.attributes.name = name
                     rospy.loginfo('timing face_id: %r (name: %r)' % ((rospy.Time.now() - ts).to_sec(),
                                                                      person.attributes.name))
             except Exception as e:
