@@ -712,16 +712,25 @@ class PoseEstimator:
 
         if do_face_id and self.face_id is not None and self.face_id.initialized:
             n = 0
+            id = 0
+            person_id = 0
             face_id_face = None
             for f in cv_faces:
-                if (f.shape[0] + f.shape[1] > n):
+
+                if f.shape[0] + f.shape[1] > n:
                     n = f.shape[0] + f.shape[1]
                     face_id_face = f
+                    person_id = id
+                id += 1
+
             if face_id_face is not None:
                 id_face = self.cv_bridge.cv2_to_imgmsg(face_id_face, "bgr8")
                 ts = rospy.Time.now()
                 name = self.face_id.get_name(id_face)
+
+                persons[face_idxs[person_id]].attributes.name = name
                 rospy.loginfo('timing face_id: %r (name: %r)' % ((rospy.Time.now() - ts).to_sec(), name))
+
             else:
                 print "No face found!"
 
