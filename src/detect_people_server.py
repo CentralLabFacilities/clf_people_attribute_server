@@ -17,6 +17,7 @@ from openpose_ros_msgs.msg import PersonAttributesWithPose
 from rospy import ServiceException
 from sensor_msgs.msg import CameraInfo, Image, RegionOfInterest
 from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import String
 
 from tf import TransformListener
 
@@ -617,6 +618,8 @@ class PoseEstimator:
 
         self.pose_estimator = TfPoseEstimator(graph_path, target_size=(w, h))
         self.result_pub = rospy.Publisher('/tf_pose/result', Image, queue_size=1)
+        self.tablet_pub = rospy.Publisher('/pepper_robot/display/face_id/image', Image, queue_size=1)
+        self.tablet_name_pub = rospy.Publisher('/pepper_robot/display/face_id/name', String, queue_size=1)
 
     def get_person_attributes(self, color, depth, is_in_mm, do_gender_age=True, do_face_id=True, resize_out_ratio=None):
 
@@ -733,6 +736,26 @@ class PoseEstimator:
 
             else:
                 print "No face found!"
+        elif do_face_id:
+            n = 0
+            id = 0
+            person_id = 0
+            face_id_face = None
+            for f in cv_faces:
+
+                if f.shape[0] + f.shape[1] > n:
+                    n = f.shape[0] + f.shape[1]
+                    face_id_face = f
+                    person_id = id
+                id += 1
+            persons[face_idxs[person_id]].attributes.name = "Kai Konen"
+
+            id_face = self.cv_bridge.cv2_to_imgmsg(face_id_face, "bgr8")
+            self.tablet_pub.publish(id_face)
+            name = String()
+            name.data = "Kai Konen"
+            self.tablet_name_pub.publish(name)
+
 
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
         return persons
