@@ -644,6 +644,7 @@ class PoseEstimator:
         persons = []
         faces = []
         face_idxs = []
+        cv_faces = []
         res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
 
         idx = 0
@@ -665,15 +666,9 @@ class PoseEstimator:
                 face = self.cv_bridge.cv2_to_imgmsg(f_roi, "bgr8")
                 faces.append(face)
                 face_idxs.append(idx)
-
+                cv_faces.append(f_roi)
                 cv2.rectangle(res_img, (fx, fy), (fx+fw, fy+fh), (255, 0, 0), 1)
-                if do_face_id and self.face_id is not None and self.face_id.initialized:
-                    ts = rospy.Time.now()
-                    name = self.face_id.get_name(face)
-                    if name is not None:
-                        person.attributes.name = name
-                    rospy.loginfo('timing face_id: %r (name: %r)' % ((rospy.Time.now() - ts).to_sec(),
-                                                                     person.attributes.name))
+
             except Exception as e:
                 rospy.loginfo('no face_roi found: %s' % e)
             try:
@@ -714,6 +709,21 @@ class PoseEstimator:
                     persons[face_idxs[i]].attributes.age_hyp = g_a[i].age_probability
             else:
                 rospy.loginfo('gender_and_age timed out: %r ' % (rospy.Time.now() - ts).to_sec())
+
+        if do_face_id and self.face_id is not None and self.face_id.initialized:
+            n = 0
+            face_id_face = None
+            for f in cv_faces:
+                if (f.shape[0] + f.shape[1] > n):
+                    n = f.shape[0] + f.shape[1]
+                    face_id_face = f
+            if face_id_face is not None:
+                id_face = self.cv_bridge.cv2_to_imgmsg(face_id_face, "bgr8")
+                ts = rospy.Time.now()
+                name = self.face_id.get_name(id_face)
+                rospy.loginfo('timing face_id: %r (name: %r)' % ((rospy.Time.now() - ts).to_sec(), name))
+            else:
+                print "No face found!"
 
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
         return persons
