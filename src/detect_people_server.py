@@ -654,7 +654,6 @@ class PoseEstimator:
         face_idxs = []
         cv_faces = []
         res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
-
         idx = 0
         for human in humans:
             person = PersonAttributesWithPose()
@@ -718,7 +717,7 @@ class PoseEstimator:
             else:
                 rospy.loginfo('gender_and_age timed out: %r ' % (rospy.Time.now() - ts).to_sec())
 
-        if do_face_id and self.face_id is not None and self.face_id.initialized:
+        if do_face_id and self.face_id is not None and self.face_id.initialized and len(persons) > 0:
             n = 0
             id = 0
             person_id = 0
@@ -735,13 +734,12 @@ class PoseEstimator:
                 id_face = self.cv_bridge.cv2_to_imgmsg(face_id_face, "bgr8")
                 ts = rospy.Time.now()
                 name = self.face_id.get_name(id_face)
-
                 persons[face_idxs[person_id]].attributes.name = name
                 rospy.loginfo('timing face_id: %r (name: %r)' % ((rospy.Time.now() - ts).to_sec(), name))
 
             else:
                 print "No face found!"
-        elif do_face_id:
+        elif do_face_id and len(persons) > 0:
             n = 0
             id = 0
             person_id = 0
@@ -753,14 +751,13 @@ class PoseEstimator:
                     face_id_face = f
                     person_id = id
                 id += 1
+            # TODO: fix hard-coded name
             persons[face_idxs[person_id]].attributes.name = "Kai Konen"
-
             id_face = self.cv_bridge.cv2_to_imgmsg(face_id_face, "bgr8")
             self.tablet_pub.publish(id_face)
             name = String()
             name.data = "Kai Konen"
             self.tablet_name_pub.publish(name)
-
 
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
         return persons
