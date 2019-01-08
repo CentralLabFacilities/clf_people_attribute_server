@@ -85,6 +85,7 @@ class ShirtColor:
 
         GRID_SIZE = int(np.floor(cols / 10))
         CV_FILLED = -1
+
         for y in range(0, rows - GRID_SIZE, GRID_SIZE):
             for x in range(0, cols - GRID_SIZE, GRID_SIZE):
                 mask = np.full((crop_img.shape[0], crop_img.shape[1]), 0, dtype=np.uint8)
@@ -274,6 +275,7 @@ class Helper:
     def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh, time_stamp, is_in_mm):
         w_factor = (float(depth_image.shape[1]) / float(color_image.shape[1]))
         h_factor = (float(depth_image.shape[0]) / float(color_image.shape[0]))
+
         x = crx * w_factor
         y = cry * h_factor
         w = crw * w_factor
@@ -327,7 +329,10 @@ class Helper:
             except Exception as e:
                 rospy.logerr("Exception %s" % e)
 
+        rospy.loginfo('number of valid depth values: %s ' % str(len(values)))
+
         depth = np.median(values)
+
         pose = PoseStamped()
         pose.pose.position.x = (float(x) - self.cx) * depth * constant_x
         pose.pose.position.y = (float(y) - self.cy) * depth * constant_y

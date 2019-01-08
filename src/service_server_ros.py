@@ -12,7 +12,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 class PeopleAttributeServer:
     def __init__(self):
-        rospy.loginfo('>>init PeopleAttributeServer')
+        rospy.loginfo('>>> init PeopleAttributeServer')
         self.image_topic = '/naoqi_driver/get_images'
         self.crowd_topic = '/open_pose/get_crowd_attributes'
         self.learn_topic = '/open_pose/learn_face'
@@ -35,7 +35,7 @@ class PeopleAttributeServer:
         self.cv_bridge = CvBridge()
         ts = rospy.Time().now()
         self.estimator = PoseEstimator(cv_bridge=self.cv_bridge, face_id=self.face_id, gender_age=self.gender_age)
-        rospy.loginfo('pose_estimator ready. net load time: %r' % (rospy.Time.now() - ts).to_sec())
+        rospy.loginfo('>>> pose_estimator ready. net load time: %r' % (rospy.Time.now() - ts).to_sec())
         self.crowd_action_server.start()
 
     def detect_crowd_service(self, request):
@@ -59,10 +59,10 @@ class PeopleAttributeServer:
             persons = self.estimator.get_person_attributes(color, depth, is_in_mm=image.depth.encoding == '16UC1',
                                                            do_gender_age=do_gender_age, do_face_id=do_face_id,
                                                            resize_out_ratio=resize_out_ratio)
-            rospy.loginfo('>> Crowd Attribute call timing: %r' % (rospy.Time.now() - ts).to_sec())
+            rospy.loginfo('>>> Crowd Attribute call timing: %r' % (rospy.Time.now() - ts).to_sec())
             return persons
         except CvBridgeError as e:
-            rospy.logerr('[tf-pose-estimation] Converting Image Error. ' + str(e))
+            rospy.logerr('>>> [tf-pose-estimation] Converting Image Error. ' + str(e))
             return []
 
     def learn_face(self, request):
@@ -75,7 +75,7 @@ class PeopleAttributeServer:
             response = self.face_id.learn_face(face, request.name)
             return response
         except CvBridgeError as e:
-            rospy.logerr('[tf-pose-estimation] Converting Image Error. ' + str(e))
+            rospy.logerr('>>> [tf-pose-estimation] Converting Image Error. ' + str(e))
             return LearnPersonResponse()
 
     def get_follow_roi(self, request):
@@ -88,7 +88,7 @@ class PeopleAttributeServer:
                                                                       is_in_mm=image.depth.encoding == '16UC1')
             return response
         except CvBridgeError as e:
-            rospy.logerr('[tf-pose-estimation] Converting Image Error. ' + str(e))
+            rospy.logerr('>>> [tf-pose-estimation] Converting Image Error. ' + str(e))
             return GetFollowRoiResponse()
 
 
