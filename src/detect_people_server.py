@@ -138,18 +138,18 @@ class GenderAndAge:
     def __init__(self, topic):
         self.topic = topic
         self.sc = rospy.ServiceProxy(self.topic, GenderAndAgeService)
-        list = GenderAndAgeList()
-        self.response = list.gender_and_age_list
+        ga_list = GenderAndAgeList()
+        self.response = ga_list.gender_and_age_list
 
         def init_service():
             try:
-                rospy.loginfo('wait for gender_age...')
+                rospy.logdebug('>>> wait for gender_age...')
                 rospy.wait_for_service(self.topic, 3.0)
                 self.initialized = True
             except rospy.ROSException as e:
                 rospy.loginfo(e)
                 self.initialized = False
-            rospy.loginfo('<<< GenderAndAge: %r' % self.initialized)
+            rospy.loginfo('>>> use gender and age? --> %r' % self.initialized)
 
         t = Thread(target=init_service())
         t.start()
@@ -161,8 +161,8 @@ class GenderAndAge:
         return 'none'
 
     def get_genders_and_ages(self, cropped_images):
-        list = GenderAndAgeList()
-        self.response = list.gender_and_age_list
+        ga_list = GenderAndAgeList()
+        self.response = ga_list.gender_and_age_list
         req = GenderAndAgeServiceRequest()
 
         def do_service_call(_cropped_images):
@@ -170,7 +170,7 @@ class GenderAndAge:
             try:
                 resp = self.sc.call(req)
                 self.response = resp.gender_and_age_response.gender_and_age_list
-                rospy.loginfo('gender_and_age thread returned: %r ' % self.short_repr(self.response))
+                rospy.loginfo('>>> gender_and_age thread returned: %r ' % self.short_repr(self.response))
             except ServiceException as e:
                 rospy.logerr(e)
                 self.response = None
@@ -183,10 +183,10 @@ class GenderAndAge:
             rospy.Rate(10.0).sleep()
         if not service_thread.isAlive():
             service_thread.join()
-            rospy.loginfo('gender_and_age thread joined. %r' % self.short_repr(self.response))
+            rospy.loginfo('>>> gender_and_age thread joined. %r' % self.short_repr(self.response))
             return self.response
         else:
-            rospy.loginfo('gender_and_age thread detached [!] %r' % self.short_repr(self.response))
+            rospy.loginfo('>>> gender_and_age thread detached [!] %r' % self.short_repr(self.response))
             return None
 
 
@@ -196,18 +196,17 @@ class FaceID:
         self.classify_topic = classify_topic
         self.learn_face_sc = rospy.ServiceProxy(self.learn_topic, LearnPersonImage)
         self.get_face_name_sc = rospy.ServiceProxy(self.classify_topic, DoIKnowThatPersonImage)
-
         self.response = ''
 
         def init_service():
             try:
-                rospy.loginfo('wait for face_id...')
+                rospy.logdebug('>>> wait for face_id...')
                 rospy.wait_for_service(self.classify_topic, 3.0)
                 self.initialized = True
             except rospy.ROSException as e:
                 rospy.loginfo(e)
                 self.initialized = False
-            rospy.loginfo('<<< FaceID: %r' % self.initialized)
+            rospy.loginfo('>>> use face id? --> %r' % self.initialized)
 
         t = Thread(target=init_service())
         t.start()
@@ -220,7 +219,7 @@ class FaceID:
             try:
                 resp = self.get_face_name_sc.call(req)
                 self.response = resp.name
-                rospy.loginfo('face_id thread returned: %r ' % self.response)
+                rospy.loginfo('>>> face_id thread returned: %r ' % self.response)
             except ServiceException as e:
                 rospy.logerr(e)
                 self.response = None
@@ -229,14 +228,15 @@ class FaceID:
         service_thread.start()
         time.sleep(0.02)
         ts = rospy.Time.now() + rospy.Duration(secs=10)
+
         while service_thread.isAlive() and ts > rospy.Time.now():
             rospy.Rate(10.0).sleep()
         if not service_thread.isAlive():
             service_thread.join()
-            rospy.loginfo('face_id thread joined. %r' % self.response)
+            rospy.loginfo('>>> face_id thread joined. %r' % self.response)
             return self.response
         else:
-            rospy.loginfo('face_id thread detached [!] %r' % self.response)
+            rospy.loginfo('>>> face_id thread detached [!] %r' % self.response)
             return None
 
     def learn_face(self, cropped_image, name):
@@ -269,7 +269,6 @@ class Helper:
         self.fy = msg.K[4]
         self.cy = msg.K[5]
         self.camera_frame = msg.header.frame_id
-        # rospy.loginfo('camera info: %r' % msg)
         self.depth_sub.unregister()
 
     def depth_lookup(self, color_image, depth_image, crx, cry, crw, crh, time_stamp, is_in_mm):
@@ -281,7 +280,7 @@ class Helper:
         w = crw * w_factor
         h = crh * h_factor
 
-        # rospy.loginfo('is in mm: %r' % is_in_mm)
+        rospy.logdebug('>>> depth image is in mm: %r' % is_in_mm)
         unit_scaling = 0.001 if is_in_mm else 1.0
         constant_x = unit_scaling / self.fx
         constant_y = unit_scaling / self.fy
@@ -322,16 +321,17 @@ class Helper:
             try:
                 value = depth_image[int(sample[1]), int(sample[0])]
                 if value == 0 or value is None:
-                    rospy.logerr('INVALID VALUE!!: %r ' % value)
+                    rospy.logerr('>>> INVALID VALUE!!: %r ' % value)
                     continue
                 values.append(value)
 
             except Exception as e:
-                rospy.logerr("Exception %s" % e)
+                rospy.logerr(">>> exception %s" % e)
 
-        rospy.loginfo('number of valid depth values: %s ' % str(len(values)))
+        rospy.logdebug('>>> number of valid depth values: %s ' % str(len(values)))
 
         pose = PoseStamped()
+
         if not values:
             # all values 0.0 or NaN
             return pose
@@ -349,10 +349,10 @@ class Helper:
         try:
             self.tf.waitForTransform(self.base_frame, self.camera_frame, time_stamp, rospy.Duration(4.0))
             transformed_pose = self.tf.transformPose(self.base_frame, pose)
-            rospy.loginfo('timing transform: %r ' % (rospy.Time.now() - ts).to_sec())
+            rospy.loginfo('>>> timing transform: %r ' % (rospy.Time.now() - ts).to_sec())
             return transformed_pose
         except Exception, e:
-            rospy.logerr("Exception %s" % e)
+            rospy.logerr(">>> exception %s" % e)
         return PoseStamped()
 
     @staticmethod
@@ -421,7 +421,7 @@ class Helper:
             elif person['LeftHip']['confidence'] > 0:
                 h = (person['LeftHip']['y'] - y)
             else:
-                rospy.logerr("no hip found")
+                rospy.logerr(">>> no hip found")
                 h = w
         else:
             if person['RightHip']['confidence'] > 0 and person['LeftHip']['confidence'] > 0:
@@ -471,7 +471,7 @@ class Helper:
                         w = h * 0.5
                         x = person['LeftShoulder']['x'] - w
                 else:
-                    rospy.loginfo("No BB possible: RShoulder['confidence'] %f, LShoulder['confidence'] %f,"
+                    rospy.loginfo(">>> no BB possible: RShoulder['confidence'] %f, LShoulder['confidence'] %f,"
                                   " RHip['confidence'] %f, LHip['confidence'] %f \n",
                                   person['RightShoulder']['confidence'], person['LeftShoulder']['confidence'],
                                   person['RightHip']['confidence'],
@@ -483,7 +483,7 @@ class Helper:
             h = h - np.abs((y + h) - image.shape[1])
 
         if (w <= 0) or (h <= 0) or (x <= 0) or (y <= 0):
-            rospy.loginfo("w or h <= 0")
+            rospy.logdebug(">>> w or h <= 0")
             x = y = w = h = 0
 
         return image[int(y):int(y + h), int(x):int(x + w)], int(x), int(y), int(w), int(h)
@@ -499,7 +499,7 @@ class Helper:
         if person['RightShoulder']['confidence'] <= 0 or person['LeftShoulder']['confidence'] <= 0 or \
                         person['RightHip']['confidence'] <= 0 \
                 or person['LeftHip']['confidence'] <= 0:
-            rospy.loginfo("Cant create crotch bounding box!")
+            rospy.loginfo(">>> can't create crotch bounding box!")
             return roi
 
         if person['RightShoulder']['x'] < person['LeftShoulder']['x']:
@@ -526,15 +526,6 @@ class Helper:
         if roi.width < min_width:
             roi.x_offset = np.max(0, roi.x_offset - (min_width - roi.width) // 2)
             roi.width = min_width
-
-        # roi.x_offset =
-        # roi.y_offset =
-        # roi.width =
-        # roi.height =
-        # cv2.imshow("CROTCH ROI", image[int(roi.y_offset):int(roi.y_offset + roi.height),
-        # int(roi.x_offset):int(roi.x_offset + roi.width)])
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
         return roi
 
     @staticmethod
@@ -598,7 +589,6 @@ class Helper:
             gestures.append(Gesture.WAVING.value)
         if len(gestures) == 0:
             gestures.append(Gesture.NEUTRAL.value)
-
         post_gest = {'posture': posture, 'gestures': gestures}
         gst = ', '.join([Gesture(gs).name for gs in gestures])
         rospy.loginfo({'posture': Posture(posture).name, 'gestures': gst})
@@ -607,7 +597,6 @@ class Helper:
 
 class PoseEstimator:
     def __init__(self, cv_bridge, face_id=None, gender_age=None, resolution='208x192', model='mobilenet_thin'):
-
         model = rospy.get_param('~model', model)
         resolution = rospy.get_param('~resolution', resolution)  # old: '432x368'
         self.resize_out_ratio = float(rospy.get_param('~resize_out_ratio', '4.0'))
@@ -616,44 +605,37 @@ class PoseEstimator:
         self.cv_bridge = cv_bridge
         self.tf_lock = Lock()
         self.helper = Helper()
-
         try:
             w, h = model_wh(resolution)
             graph_path = get_graph_path(model)
             rospack = rospkg.RosPack()
             graph_path = os.path.join(rospack.get_path('tfpose_ros'), graph_path)
         except Exception as e:
-            rospy.logerr('invalid model: %s, e=%s' % (model, e))
+            rospy.logerr('>>> invalid model: %s, e=%s' % (model, e))
             sys.exit(-1)
-
         self.pose_estimator = TfPoseEstimator(graph_path, target_size=(w, h))
         self.result_pub = rospy.Publisher('/tf_pose/result', Image, queue_size=1)
         self.tablet_pub = rospy.Publisher('/pepper_robot/display/face_id/image', Image, queue_size=1)
         self.tablet_name_pub = rospy.Publisher('/pepper_robot/display/face_id/name', String, queue_size=1)
 
     def get_person_attributes(self, color, depth, is_in_mm, do_gender_age=True, do_face_id=True, resize_out_ratio=None):
-
         rospy.loginfo('----------------------------------------')
         w = color.shape[1]
         h = color.shape[0]
         acquired = self.tf_lock.acquire(False)
         if not acquired:
-            rospy.loginfo('tf-lock still acquired... returning')
+            rospy.loginfo('>>> tf-lock still acquired... returning')
             return []
-
         if resize_out_ratio is None:
             resize_out_ratio = self.resize_out_ratio
-
         try:
             time_stamp = rospy.Time.now()
             result = self.pose_estimator.inference(color, resize_to_default=True,
                                                    upsample_size=resize_out_ratio)
-            rospy.loginfo('>> timing tf_pose: %r (found %r people)' % ((rospy.Time.now() - time_stamp).to_sec(),
-                                                                       len(result)))
+            rospy.loginfo('>>> timing tf_pose: %r (found %r people)' % ((rospy.Time.now() - time_stamp).to_sec(), len(result)))
             humans = self.humans_to_dict(result, w, h)
         finally:
             self.tf_lock.release()
-
         persons = []
         faces = []
         face_idxs = []
@@ -662,33 +644,28 @@ class PoseEstimator:
         idx = 0
         for human in humans:
             person = PersonAttributesWithPose()
-
             pg = Helper.get_posture_and_gestures(human)
             person.attributes.posture = pg['posture']
             person.attributes.gestures = pg['gestures']
-
             try:
                 ts = rospy.Time.now()
                 f_roi, fx, fy, fw, fh = Helper.head_roi(color, human)
-
-                rospy.loginfo('timing head_roi: %r' % (rospy.Time.now() - ts).to_sec())
+                rospy.loginfo('>>> timing head_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
                 person.head_pose_stamped = self.helper.depth_lookup(color, depth, fx, fy, fw, fh, time_stamp, is_in_mm)
-                rospy.loginfo('timing DLU: %r' % (rospy.Time.now() - ts).to_sec())
+                rospy.loginfo('>>> timing DLU: %r' % (rospy.Time.now() - ts).to_sec())
                 face = self.cv_bridge.cv2_to_imgmsg(f_roi, "bgr8")
                 faces.append(face)
                 face_idxs.append(idx)
                 cv_faces.append(f_roi)
                 cv2.rectangle(res_img, (fx, fy), (fx+fw, fy+fh), (255, 0, 0), 1)
-
             except Exception as e:
-                rospy.loginfo('no face_roi found: %s' % e)
+                rospy.loginfo('>>> no face_roi found: %s' % e)
             try:
 
                 ts = rospy.Time.now()
                 b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, human)
-
-                rospy.loginfo('timing body_roi: %r' % (rospy.Time.now() - ts).to_sec())
+                rospy.loginfo('>>> timing body_roi: %r' % (rospy.Time.now() - ts).to_sec())
                 ts = rospy.Time.now()
                 person.attributes.shirtcolor = ShirtColor.get_shirt_color(b_roi)
                 try:
@@ -701,27 +678,24 @@ class PoseEstimator:
                     self.drawTextWithBG(res_img, gst, (int(bx), int(by+h+10+h+10)))
                 except Exception as e:
                     rospy.loginfo(e)
-                rospy.loginfo('timing shirt_color: %r (color: %r)' % ((rospy.Time.now() - ts).to_sec(),
+                rospy.loginfo('>>> timing shirt_color: %r (color: %r)' % ((rospy.Time.now() - ts).to_sec(),
                                                                       person.attributes.shirtcolor))
                 person.pose_stamped = self.helper.depth_lookup(color, depth, bx, by, bw, bh, time_stamp, is_in_mm)
             except ValueError as e:
                 pass
-
             persons.append(person)
             idx += 1
-
         if do_gender_age and self.gender_age is not None and self.gender_age.initialized and len(faces) > 0:
             ts = rospy.Time.now()
             g_a = self.gender_age.get_genders_and_ages(faces)
             if g_a is not None:
-                rospy.loginfo('timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
-                rospy.loginfo('gender & ages: %r' % self.gender_age.short_repr(g_a))
+                rospy.loginfo('>>> timing gender_and_age: %r' % (rospy.Time.now() - ts).to_sec())
+                rospy.loginfo('>>> gender & ages: %r' % self.gender_age.short_repr(g_a))
                 for i in range(0, len(faces)):
                     persons[face_idxs[i]].attributes.gender_hyp = g_a[i].gender_probability
                     persons[face_idxs[i]].attributes.age_hyp = g_a[i].age_probability
             else:
-                rospy.loginfo('gender_and_age timed out: %r ' % (rospy.Time.now() - ts).to_sec())
-
+                rospy.loginfo('>>> gender_and_age timed out: %r ' % (rospy.Time.now() - ts).to_sec())
         if do_face_id and self.face_id is not None and self.face_id.initialized and len(persons) > 0:
             n = 0
             id = 0
@@ -734,16 +708,14 @@ class PoseEstimator:
                     face_id_face = f
                     person_id = id
                 id += 1
-
             if face_id_face is not None:
                 id_face = self.cv_bridge.cv2_to_imgmsg(face_id_face, "bgr8")
                 ts = rospy.Time.now()
                 name = self.face_id.get_name(id_face)
                 persons[face_idxs[person_id]].attributes.name = name
-                rospy.loginfo('timing face_id: %r (name: %r)' % ((rospy.Time.now() - ts).to_sec(), name))
-
+                rospy.loginfo('>>> timing face_id: %r (name: %r)' % ((rospy.Time.now() - ts).to_sec(), name))
             else:
-                print "No face found!"
+                rospy.loginfo(">>> no face found!")
         elif do_face_id and len(persons) > 0:
             n = 0
             id = 0
@@ -763,7 +735,6 @@ class PoseEstimator:
             name = String()
             name.data = "Kai Konen"
             self.tablet_name_pub.publish(name)
-
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
         return persons
 
@@ -784,26 +755,18 @@ class PoseEstimator:
 
     def get_closest_person(self, persons, color, depth, is_in_mm):
         dist = 9999
-        closest_pose = None
         closest_person = None
-
         for person in persons:
             try:
                 b_roi, bx, by, bw, bh = Helper.upper_body_roi(color, person)
                 ts = rospy.Time.now()
                 pose = self.helper.depth_lookup(color, depth, bx, by, bw, bh, ts, is_in_mm)
-                print("PERSON POSE ")
-                print(pose)
                 if pose is not None:
                     if dist > pose.pose.position.x > 0:
                         dist = pose.pose.position.x
                         closest_person = person
-                        closest_pose = pose
             except Exception as e:
-                rospy.loginfo('Error in get_closest_person: %r' % e)
-
-        print("Closest person pose:")
-        print(closest_pose)
+                rospy.logerr('>>> error in get_closest_person: %r' % e)
         return closest_person
 
     def get_closest_person_face(self, color, depth, is_in_mm):
@@ -812,7 +775,6 @@ class PoseEstimator:
         persons = self.humans_to_dict(self.pose_estimator.inference(color, resize_to_default=True,
                                                                     upsample_size=self.resize_out_ratio), w, h)
         person = self.get_closest_person(persons, color, depth, is_in_mm)
-
         return self.helper.head_roi(color, person)[0]
 
     def get_closest_person_body_roi(self, color, depth, is_in_mm):
@@ -823,17 +785,14 @@ class PoseEstimator:
         persons = self.humans_to_dict(result, w, h)
         res_img = self.pose_estimator.draw_humans(color, result, imgcopy=True)
         self.result_pub.publish(self.cv_bridge.cv2_to_imgmsg(res_img, "bgr8"))
-
         person = self.get_closest_person(persons, color, depth, is_in_mm)
         body_roi = RegionOfInterest()
         try:
             if person is not None:
                 body_roi = self.helper.get_crotch_roi(person)
-
         except Exception as e:
-            rospy.logerr('error while getting crotch roi: %s' % e)
-        rospy.loginfo('crotch roi: %r' % body_roi)
-
+            rospy.logerr('>>> error while getting crotch roi: %s' % e)
+        rospy.loginfo('>>> crotch roi: %r' % body_roi)
         return body_roi
 
     @staticmethod
@@ -851,6 +810,5 @@ class PoseEstimator:
                     person[part] = {'confidence': 0.0,
                                     'x': 0,
                                     'y': 0}
-                    # print(person[part])
             persons.append(person)
         return persons

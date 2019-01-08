@@ -21,10 +21,10 @@ class PeopleAttributeServer:
         self.face_know_topic = 'clf_face_identification_know_image'
         self.face_learn_topic = 'clf_face_identification_learn_image'
         self.gender_age_topic = 'clf_gender_age_classify_array'
+
         rospy.init_node('people_attribute_server')
 
         self.image_grabber = rospy.ServiceProxy(self.image_topic, DepthAndColorImage)
-        self.crowd_service = rospy.Service(self.crowd_topic, GetCrowdAttributesWithPose, self.detect_crowd_service)
         self.crowd_action_server = actionlib.SimpleActionServer(self.crowd_topic, GetCrowdAttributesWithPoseAction,
                                                                 self.detect_crowd_action, auto_start=False)
         self.learn_service = rospy.Service(self.learn_topic, LearnPerson, self.learn_face)
@@ -33,15 +33,12 @@ class PeopleAttributeServer:
         self.face_id = FaceID(self.face_know_topic, self.face_learn_topic)
         self.gender_age = GenderAndAge(self.gender_age_topic)
         self.cv_bridge = CvBridge()
+
         ts = rospy.Time().now()
+
         self.estimator = PoseEstimator(cv_bridge=self.cv_bridge, face_id=self.face_id, gender_age=self.gender_age)
         rospy.loginfo('>>> pose_estimator ready. net load time: %r' % (rospy.Time.now() - ts).to_sec())
         self.crowd_action_server.start()
-
-    def detect_crowd_service(self, request):
-        response = GetCrowdAttributesWithPoseResponse()
-        response.attributes = self.detect_crowd()
-        return response
 
     def detect_crowd_action(self, goal):
         result = GetCrowdAttributesWithPoseResult()
