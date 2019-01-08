@@ -600,7 +600,8 @@ class Helper:
             gestures.append(Gesture.NEUTRAL.value)
 
         post_gest = {'posture': posture, 'gestures': gestures}
-        rospy.loginfo(post_gest)
+        gst = ', '.join([Gesture(gs).name for gs in gestures])
+        rospy.loginfo({'posture': Posture(posture).name, 'gestures': gst})
         return post_gest
 
 
@@ -840,9 +841,9 @@ class PoseEstimator:
         persons = []
         for human in humans:
             person = {}
-            for part in body_parts:
+            for part_index, part in enumerate(body_parts):
                 try:
-                    body_part = human.body_parts[body_parts.index(part)]
+                    body_part = human.body_parts[part_index]
                     person[part] = {'confidence': body_part.score,
                                     'x': body_part.x * w,
                                     'y': body_part.y * h}
