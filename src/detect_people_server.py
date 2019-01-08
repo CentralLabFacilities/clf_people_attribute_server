@@ -331,9 +331,13 @@ class Helper:
 
         rospy.loginfo('number of valid depth values: %s ' % str(len(values)))
 
+        pose = PoseStamped()
+        if not values:
+            # all values 0.0 or NaN
+            return pose
+
         depth = np.median(values)
 
-        pose = PoseStamped()
         pose.pose.position.x = (float(x) - self.cx) * depth * constant_x
         pose.pose.position.y = (float(y) - self.cy) * depth * constant_y
         pose.pose.position.z = depth * unit_scaling
